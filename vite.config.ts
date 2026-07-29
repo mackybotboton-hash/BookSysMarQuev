@@ -24,19 +24,19 @@ export default defineConfig({
             type: 'image/svg+xml'
           },
           {
-            src: 'logo.jpg',
+            src: 'logo-192x192.png',
             sizes: '192x192',
-            type: 'image/jpeg'
+            type: 'image/png'
           },
           {
-            src: 'logo.jpg',
+            src: 'logo-512x512.png',
             sizes: '512x512',
-            type: 'image/jpeg'
+            type: 'image/png'
           },
           {
-            src: 'logo.jpg',
+            src: 'logo-512x512.png',
             sizes: '512x512',
-            type: 'image/jpeg',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]
