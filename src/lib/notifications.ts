@@ -84,22 +84,84 @@ function playChimeNodes(ctx: AudioContext) {
   }
 }
 
+// VAPID Public Key for Web Push
+const VAPID_PUBLIC_KEY = 'BLt92sHxS8LM3tyCRgdTVy8U_RflljZ5fyjkNQyB0S3zd9-8JNOiW9F9-n6wkT6K41OBmx101geNaaoUEUrei2o'
+
+function urlB64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
+// Subscribe to Background Push Notifications
+export async function subscribeToPushNotifications(userId: string, role: string) {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
+
+    const registration = await navigator.serviceWorker.ready
+    let subscription = await registration.pushManager.getSubscription()
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY)
+      })
+    }
+
+    const p256dh = subscription.getKey('p256dh')
+    const auth = subscription.getKey('auth')
+
+    if (!p256dh || !auth) return false
+
+    const { supabase } = await import('@/lib/supabase')
+    
+    // Check if subscription already exists
+    const { data: existing } = await supabase
+      .from('push_subscriptions')
+      .select('id')
+      .eq('endpoint', subscription.endpoint)
+      .maybeSingle()
+
+    if (!existing) {
+      await supabase.from('push_subscriptions').insert({
+        user_id: userId,
+        role: role,
+        endpoint: subscription.endpoint,
+        p256dh: btoa(String.fromCharCode.apply(null, new Uint8Array(p256dh) as unknown as number[])),
+        auth: btoa(String.fromCharCode.apply(null, new Uint8Array(auth) as unknown as number[]))
+      })
+    }
+    return true
+  } catch (error) {
+    console.error('Error subscribing to push notifications:', error)
+    return false
+  }
+}
+
 // Request Browser Push Notification Permission (Facebook-style prompt)
-export async function requestNotificationPermission(): Promise<boolean> {
+export async function requestNotificationPermission(userId?: string, role?: string): Promise<boolean> {
   if (!('Notification' in window)) {
     return false
   }
 
-  if (Notification.permission === 'granted') {
-    return true
-  }
-
-  if (Notification.permission !== 'denied') {
+  let granted = Notification.permission === 'granted'
+  
+  if (!granted && Notification.permission !== 'denied') {
     const permission = await Notification.requestPermission()
-    return permission === 'granted'
+    granted = permission === 'granted'
   }
 
-  return false
+  if (granted && userId && role) {
+    // If granted and user info provided, setup background push
+    await subscribeToPushNotifications(userId, role)
+  }
+
+  return granted
 }
 
 // Trigger OS/Browser Native Desktop Notification

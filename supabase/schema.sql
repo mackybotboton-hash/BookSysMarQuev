@@ -356,3 +356,37 @@ CREATE TABLE IF NOT EXISTS public.calendar_events (
 ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Anyone can manage calendar_events" ON public.calendar_events;
 CREATE POLICY "Anyone can manage calendar_events" ON public.calendar_events FOR ALL USING (true) WITH CHECK (true);
+- -   C r e a t e   p u s h _ s u b s c r i p t i o n s   t a b l e  
+ C R E A T E   T A B L E   I F   N O T   E X I S T S   p u b l i c . p u s h _ s u b s c r i p t i o n s   (  
+         i d   U U I D   D E F A U L T   g e n _ r a n d o m _ u u i d ( )   P R I M A R Y   K E Y ,  
+         u s e r _ i d   U U I D   R E F E R E N C E S   a u t h . u s e r s ( i d )   O N   D E L E T E   C A S C A D E ,  
+         r o l e   T E X T   N O T   N U L L   D E F A U L T   ' c l i e n t ' ,  
+         e n d p o i n t   T E X T   N O T   N U L L   U N I Q U E ,  
+         p 2 5 6 d h   T E X T   N O T   N U L L ,  
+         a u t h   T E X T   N O T   N U L L ,  
+         c r e a t e d _ a t   T I M E S T A M P   W I T H   T I M E   Z O N E   D E F A U L T   t i m e z o n e ( ' u t c ' : : t e x t ,   n o w ( ) )   N O T   N U L L  
+ ) ;  
+  
+ - -   E n a b l e   R L S  
+ A L T E R   T A B L E   p u b l i c . p u s h _ s u b s c r i p t i o n s   E N A B L E   R O W   L E V E L   S E C U R I T Y ;  
+  
+ - -   P o l i c i e s  
+ C R E A T E   P O L I C Y   " U s e r s   c a n   v i e w   t h e i r   o w n   s u b s c r i p t i o n s "  
+         O N   p u b l i c . p u s h _ s u b s c r i p t i o n s   F O R   S E L E C T  
+         U S I N G   ( a u t h . u i d ( )   =   u s e r _ i d ) ;  
+  
+ C R E A T E   P O L I C Y   " U s e r s   c a n   i n s e r t   t h e i r   o w n   s u b s c r i p t i o n s "  
+         O N   p u b l i c . p u s h _ s u b s c r i p t i o n s   F O R   I N S E R T  
+         W I T H   C H E C K   ( a u t h . u i d ( )   =   u s e r _ i d ) ;  
+  
+ C R E A T E   P O L I C Y   " U s e r s   c a n   d e l e t e   t h e i r   o w n   s u b s c r i p t i o n s "  
+         O N   p u b l i c . p u s h _ s u b s c r i p t i o n s   F O R   D E L E T E  
+         U S I N G   ( a u t h . u i d ( )   =   u s e r _ i d ) ;  
+  
+ C R E A T E   P O L I C Y   " A d m i n s   c a n   v i e w   a l l   s u b s c r i p t i o n s "  
+         O N   p u b l i c . p u s h _ s u b s c r i p t i o n s   F O R   S E L E C T  
+         U S I N G   ( E X I S T S   (  
+                 S E L E C T   1   F R O M   p r o f i l e s    
+                 W H E R E   p r o f i l e s . i d   =   a u t h . u i d ( )   A N D   p r o f i l e s . r o l e   =   ' a d m i n '  
+         ) ) ;  
+ 

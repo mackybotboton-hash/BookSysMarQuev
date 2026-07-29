@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth-store'
+import { requestNotificationPermission } from '@/lib/notifications'
 
 export function useAuth() {
   const { setUser, setSession, setProfile, setLoading, reset } = useAuthStore()
@@ -66,6 +67,15 @@ export function useAuth() {
       setProfile(newProfile as any)
       localStorage.setItem('marquevedo_auth_profile', JSON.stringify(newProfile))
     }
+    
+    // Request Push Notification permissions silently (will prompt if not granted)
+    const activeProfile = useAuthStore.getState().profile
+    if (activeProfile) {
+      setTimeout(() => {
+        requestNotificationPermission(activeProfile.id, activeProfile.role).catch(console.error)
+      }, 2000)
+    }
+    
     setLoading(false)
   }
 

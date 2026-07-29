@@ -93,11 +93,23 @@ export function useCreateBooking() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['dateBookings'] })
       queryClient.invalidateQueries({ queryKey: ['clientBookings'] })
+      
+      // Trigger Push Notification to Admins
+      if (data) {
+        supabase.functions.invoke('send-push', {
+          body: {
+            title: 'New Booking Request',
+            message: `A new booking was placed for ${data.booking_date}.`,
+            targetRole: 'admin',
+            url: '/bookings'
+          }
+        }).catch(err => console.error('Failed to trigger push:', err))
+      }
     },
   })
 }
@@ -115,11 +127,23 @@ export function useUpdateBooking() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['dateBookings'] })
       queryClient.invalidateQueries({ queryKey: ['clientBookings'] })
+      
+      // Trigger Push Notification to Client if status changed to confirmed
+      if (data && data.status === 'confirmed') {
+        supabase.functions.invoke('send-push', {
+          body: {
+            title: 'Booking Confirmed!',
+            message: `Your booking for ${data.booking_date} has been confirmed.`,
+            targetUserId: data.user_id,
+            url: '/client-dashboard'
+          }
+        }).catch(err => console.error('Failed to trigger push:', err))
+      }
     },
   })
 }
