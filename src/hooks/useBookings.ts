@@ -108,7 +108,7 @@ export function useCreateBooking() {
             targetRole: 'admin',
             url: '/bookings'
           }
-        }).catch(err => console.error('Failed to trigger push:', err))
+        }).catch((err: any) => console.error('Failed to trigger push:', err))
       }
     },
   })
@@ -142,7 +142,7 @@ export function useUpdateBooking() {
             targetUserId: data.user_id,
             url: '/client-dashboard'
           }
-        }).catch(err => console.error('Failed to trigger push:', err))
+        }).catch((err: any) => console.error('Failed to trigger push:', err))
       }
     },
   })
