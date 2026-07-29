@@ -4,8 +4,9 @@ import type { Service } from '@/lib/database.types'
 
 type ServiceInsert = {
   name: string
-  category: 'Hair' | 'Nails' | 'Other'
+  category: string
   price: number
+  home_service_price?: number
   estimated_cost?: number
   duration_minutes?: number
   is_active?: boolean
@@ -45,6 +46,7 @@ export function useServices() {
       const estMap = getEstCostMap()
       return (data ?? []).map((s: any) => ({
         ...s,
+        home_service_price: Number(s.home_service_price ?? 0),
         estimated_cost: Number(s.estimated_cost ?? estMap[s.id] ?? 0),
       })) as Service[]
     },
@@ -66,6 +68,7 @@ export function useActiveServices() {
       const estMap = getEstCostMap()
       return (data ?? []).map((s: any) => ({
         ...s,
+        home_service_price: Number(s.home_service_price ?? 0),
         estimated_cost: Number(s.estimated_cost ?? estMap[s.id] ?? 0),
       })) as Service[]
     },

@@ -32,7 +32,11 @@ export default function BookingForm({ booking, defaultDate, defaultTime, onClose
   })
 
   const selectedService = services?.find(s => s.id === form.service_id)
-  const totalPrice = selectedService?.price || booking?.total_price || 0
+  const isHomeService = form.notes.includes('[HOME SERVICE]')
+  const basePrice = selectedService?.price || 0
+  
+  const homeServiceFee = isHomeService ? (selectedService?.home_service_price || 0) : 0
+  const totalPrice = selectedService ? (basePrice + homeServiceFee) : (booking?.total_price || 0)
   const timeSlots = generateTimeSlots()
 
   const endTime = (() => {
@@ -258,11 +262,19 @@ export default function BookingForm({ booking, defaultDate, defaultTime, onClose
 
           {/* Price Summary */}
           {selectedService && (
-            <div className="bg-emerald/5 rounded-lg p-3 flex items-center justify-between">
-              <span className="text-sm text-gray-600">Total Price</span>
-              <span className="font-heading font-bold text-lg text-emerald">
-                {formatCurrency(totalPrice)}
-              </span>
+            <div className="bg-emerald/5 rounded-lg p-3 flex flex-col justify-center">
+              {isHomeService && (
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1 font-medium">
+                  <span>Home Service</span>
+                  <span>{formatCurrency(basePrice)} + {formatCurrency(homeServiceFee)} home service</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Total Price</span>
+                <span className="font-heading font-bold text-lg text-emerald">
+                  {formatCurrency(totalPrice)}
+                </span>
+              </div>
             </div>
           )}
 

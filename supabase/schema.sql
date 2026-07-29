@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   client_name TEXT NOT NULL,
   client_phone TEXT DEFAULT '',
+  client_email TEXT DEFAULT '',
   service_id UUID REFERENCES services(id) ON DELETE SET NULL,
   staff_id UUID REFERENCES staff(id) ON DELETE SET NULL,
   booking_date DATE NOT NULL,

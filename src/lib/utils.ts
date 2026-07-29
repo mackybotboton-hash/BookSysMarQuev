@@ -45,9 +45,11 @@ export function getStatusColor(status: string): string {
 
 export function formatDuration(minutes: number): string {
   if (!minutes || minutes <= 0) return '0 mins'
-  if (minutes < 60) return `${minutes} mins`
-  const hrs = Math.floor(minutes / 60)
-  const remainingMins = minutes % 60
+  // Round to nearest 5 minutes for UI polish (e.g. 83 mins -> 85 mins)
+  const rounded = Math.round(minutes / 5) * 5
+  if (rounded < 60) return `${rounded} mins`
+  const hrs = Math.floor(rounded / 60)
+  const remainingMins = rounded % 60
   if (remainingMins === 0) return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'}`
   return `${hrs} ${hrs === 1 ? 'hr' : 'hrs'} ${remainingMins} mins`
 }

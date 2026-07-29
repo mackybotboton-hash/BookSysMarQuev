@@ -9,7 +9,7 @@ import { formatCurrency, formatDuration, cn } from '@/lib/utils'
 import {
   Scissors, Sparkles, Clock, Star, ShieldCheck, CalendarCheck,
   CheckCircle, ArrowRight, Phone, MapPin, Search, User, LogIn, LayoutDashboard,
-  Edit3, Save, RotateCcw, Check, Eye
+  Edit3, Save, RotateCcw, Check, Eye, Sun, Moon
 } from 'lucide-react'
 import AuthModal from '@/components/auth/AuthModal'
 import type { Service } from '@/lib/database.types'
@@ -95,6 +95,17 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [pendingService, setPendingService] = useState<Service | null>(null)
+
+  // Light Mode State
+  const [isLightMode, setIsLightMode] = useState(() => {
+    const saved = localStorage.getItem('marquevedo_light_mode')
+    return saved === 'true'
+  })
+
+  // Persist Light Mode
+  useEffect(() => {
+    localStorage.setItem('marquevedo_light_mode', String(isLightMode))
+  }, [isLightMode])
 
   // Fetch home page CMS content from Supabase site_content table
   const { data: dbCms, refetch: refetchCms } = useQuery({
@@ -297,7 +308,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-offwhite flex flex-col font-body relative">
+    <div className={cn(
+      "min-h-screen flex flex-col font-body relative transition-colors duration-500",
+      isLightMode ? "bg-white text-charcoal" : "bg-offwhite"
+    )}>
       {/* Admin Floating CMS Toolbar */}
       {isAdmin && (
         <div className="sticky top-0 z-50 bg-[#061510] text-white border-b-2 border-gold py-2.5 px-4 shadow-2xl">
@@ -352,7 +366,10 @@ export default function Home() {
       )}
 
       {/* 1. Header / Navbar */}
-      <header className="sticky top-0 z-40 bg-emerald/95 backdrop-blur-md border-b border-emerald-800/40 text-white shadow-md">
+      <header className={cn(
+        "sticky top-0 z-40 backdrop-blur-md border-b shadow-md transition-colors duration-500",
+        isLightMode ? "bg-white/95 border-emerald-100 text-charcoal" : "bg-emerald/95 border-emerald-800/40 text-white"
+      )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
             <img
@@ -372,16 +389,26 @@ export default function Home() {
 
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-            <a href="#services" className="text-emerald-100 hover:text-gold transition-colors">Services</a>
-            <a href="#why-us" className="text-emerald-100 hover:text-gold transition-colors">Why Choose Us</a>
-            <a href="#reviews" className="text-emerald-100 hover:text-gold transition-colors flex items-center gap-1">
+            <a href="#services" className={cn("transition-colors", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>Services</a>
+            <a href="#why-us" className={cn("transition-colors", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>Why Choose Us</a>
+            <a href="#reviews" className={cn("transition-colors flex items-center gap-1", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>
               <Star size={14} className="fill-gold text-gold" /> Customer Reviews
             </a>
-            <a href="#contact" className="text-emerald-100 hover:text-gold transition-colors">Contact</a>
+            <a href="#contact" className={cn("transition-colors", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>Contact</a>
           </nav>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsLightMode(!isLightMode)}
+              className={cn(
+                "p-2 rounded-full transition-all duration-300",
+                isLightMode ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" : "bg-emerald-800/50 text-gold hover:bg-emerald-800"
+              )}
+              title={isLightMode ? "Switch to Dark Theme" : "Switch to Light Theme"}
+            >
+              {isLightMode ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             {user ? (
               <Link
                 to={profile?.role === 'admin' ? '/dashboard' : '/client-dashboard'}
@@ -392,7 +419,10 @@ export default function Home() {
             ) : (
               <button
                 onClick={() => { setAuthMode('signin'); setShowAuthModal(true); }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-100 hover:text-gold transition-colors"
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-colors",
+                  isLightMode ? "text-emerald-700 hover:text-emerald" : "text-emerald-100 hover:text-gold"
+                )}
               >
                 <LogIn size={15} /> Sign In
               </button>
@@ -402,14 +432,20 @@ export default function Home() {
       </header>
 
       {/* 2. Hero Section */}
-      <section className="relative bg-emerald text-white overflow-hidden py-16 sm:py-24">
+      <section className={cn(
+        "relative overflow-hidden py-16 sm:py-24 transition-colors duration-500",
+        isLightMode ? "bg-emerald-50 text-charcoal" : "bg-emerald text-white"
+      )}>
         <div className="absolute inset-0 z-0">
           <img
             src="/salon_hero.png"
             alt="Salon Interior"
             className="w-full h-full object-cover opacity-20 filter brightness-90"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-900/90 to-emerald-950/80" />
+          <div className={cn(
+            "absolute inset-0 transition-opacity duration-500",
+            isLightMode ? "bg-gradient-to-r from-emerald-50 via-emerald-50/95 to-emerald-50/80" : "bg-gradient-to-r from-emerald-950 via-emerald-900/90 to-emerald-950/80"
+          )} />
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
@@ -439,7 +475,10 @@ export default function Home() {
                   className="w-full bg-black/60 border-2 border-gold rounded-xl p-3 text-2xl sm:text-3xl font-heading font-extrabold text-white focus:outline-none"
                 />
               ) : (
-                <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+                <h1 className={cn(
+                  "font-heading text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight transition-colors duration-500",
+                  isLightMode ? "text-emerald-950" : "text-white"
+                )}>
                   {cms.heroTitle}
                 </h1>
               )}
@@ -453,7 +492,10 @@ export default function Home() {
                   className="w-full bg-black/60 border-2 border-gold rounded-xl p-3 text-xs sm:text-sm text-emerald-100 focus:outline-none"
                 />
               ) : (
-                <p className="text-emerald-100/90 text-base sm:text-lg max-w-2xl font-light leading-relaxed">
+                <p className={cn(
+                  "text-sm sm:text-base max-w-xl font-medium leading-relaxed transition-colors duration-500",
+                  isLightMode ? "text-emerald-800/80" : "text-emerald-100"
+                )}>
                   {cms.heroDescription}
                 </p>
               )}
@@ -478,7 +520,10 @@ export default function Home() {
 
                 <a
                   href="#services"
-                  className="px-6 py-3.5 rounded-lg border border-emerald-300/30 text-emerald-100 hover:bg-white/10 text-sm font-medium transition-all"
+                  className={cn(
+                    "px-6 py-3.5 rounded-lg border text-sm font-medium transition-all",
+                    isLightMode ? "border-emerald-200 text-emerald-800 hover:bg-emerald-100" : "border-emerald-300/30 text-emerald-100 hover:bg-white/10"
+                  )}
                 >
                   {isEditMode ? (
                     <input
@@ -494,7 +539,10 @@ export default function Home() {
               </div>
 
               {/* Trust Badges */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-emerald-800/60 max-w-lg">
+              <div className={cn(
+                "grid grid-cols-3 gap-4 pt-6 border-t max-w-lg transition-colors duration-500",
+                isLightMode ? "border-emerald-200" : "border-emerald-800/60"
+              )}>
                 <div>
                   {isEditMode ? (
                     <input
@@ -504,9 +552,9 @@ export default function Home() {
                       className="bg-black/60 border border-gold text-gold font-bold text-xl rounded px-1 w-20"
                     />
                   ) : (
-                    <p className="font-heading text-2xl font-bold text-gold">{cms.statRating}</p>
+                    <p className={cn("font-heading text-2xl font-bold", isLightMode ? "text-emerald-700" : "text-gold")}>{cms.statRating}</p>
                   )}
-                  <p className="text-xs text-emerald-200/70">{cms.statRatingLabel}</p>
+                  <p className={cn("text-xs", isLightMode ? "text-emerald-900/60" : "text-emerald-200/70")}>{cms.statRatingLabel}</p>
                 </div>
 
                 <div>
@@ -518,9 +566,9 @@ export default function Home() {
                       className="bg-black/60 border border-gold text-gold font-bold text-xl rounded px-1 w-24"
                     />
                   ) : (
-                    <p className="font-heading text-2xl font-bold text-gold">{cms.statClients}</p>
+                    <p className={cn("font-heading text-2xl font-bold", isLightMode ? "text-emerald-700" : "text-gold")}>{cms.statClients}</p>
                   )}
-                  <p className="text-xs text-emerald-200/70">{cms.statClientsLabel}</p>
+                  <p className={cn("text-xs", isLightMode ? "text-emerald-900/60" : "text-emerald-200/70")}>{cms.statClientsLabel}</p>
                 </div>
 
                 <div>
@@ -532,9 +580,9 @@ export default function Home() {
                       className="bg-black/60 border border-gold text-gold font-bold text-xl rounded px-1 w-20"
                     />
                   ) : (
-                    <p className="font-heading text-2xl font-bold text-gold">{cms.statGuarantee}</p>
+                    <p className={cn("font-heading text-2xl font-bold", isLightMode ? "text-emerald-700" : "text-gold")}>{cms.statGuarantee}</p>
                   )}
-                  <p className="text-xs text-emerald-200/70">{cms.statGuaranteeLabel}</p>
+                  <p className={cn("text-xs", isLightMode ? "text-emerald-900/60" : "text-emerald-200/70")}>{cms.statGuaranteeLabel}</p>
                 </div>
               </div>
             </div>
@@ -731,23 +779,29 @@ export default function Home() {
       </section>
 
       {/* 5. Customer Reviews Section */}
-      <section id="reviews" className="bg-emerald-950 text-white py-16 border-t border-emerald-800/60">
+      <section id="reviews" className={cn(
+        "py-16 border-t transition-colors duration-500",
+        isLightMode ? "bg-emerald-50 text-charcoal border-emerald-100" : "bg-emerald-950 text-white border-emerald-800/60"
+      )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="text-xs font-bold text-gold uppercase tracking-widest flex items-center justify-center gap-1">
               <Star size={14} className="fill-gold" /> Client Testimonials
             </span>
-            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white mt-1">
+            <h2 className={cn("font-heading text-3xl sm:text-4xl font-extrabold mt-1", isLightMode ? "text-emerald-950" : "text-white")}>
               What Our Clients Say About Us
             </h2>
-            <p className="text-emerald-200/70 text-sm mt-2">
+            <p className={cn("text-sm mt-2", isLightMode ? "text-emerald-800/70" : "text-emerald-200/70")}>
               Read real 5-star ratings and reviews submitted by clients after their salon treatments.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {allReviews.slice(0, 6).map((rev, idx) => (
-              <div key={rev.id ? `review-${rev.id}-${idx}` : `review-${idx}`} className="bg-emerald-900/40 p-6 rounded-2xl border border-emerald-800/50 space-y-4 hover:border-gold/40 transition-all shadow-lg">
+              <div key={rev.id ? `review-${rev.id}-${idx}` : `review-${idx}`} className={cn(
+                "p-6 rounded-2xl border space-y-4 hover:border-gold/40 transition-all shadow-lg",
+                isLightMode ? "bg-white border-emerald-100" : "bg-emerald-900/40 border-emerald-800/50"
+              )}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((s) => (
@@ -759,13 +813,13 @@ export default function Home() {
                   </span>
                 </div>
 
-                <p className="text-xs text-emerald-100/90 leading-relaxed italic">
+                <p className={cn("text-xs leading-relaxed italic", isLightMode ? "text-charcoal" : "text-emerald-100/90")}>
                   "{rev.comment}"
                 </p>
 
-                <div className="pt-3 border-t border-emerald-800/50 flex items-center justify-between">
+                <div className={cn("pt-3 border-t flex items-center justify-between", isLightMode ? "border-emerald-100" : "border-emerald-800/50")}>
                   <div>
-                    <h4 className="font-bold text-sm text-white">{rev.client_name}</h4>
+                    <h4 className={cn("font-bold text-sm capitalize", isLightMode ? "text-emerald-950" : "text-white")}>{rev.client_name}</h4>
                     <p className="text-[11px] text-gold font-medium">{rev.service_name}</p>
                   </div>
                   <span className="text-[10px] text-emerald-300/60">
@@ -779,7 +833,10 @@ export default function Home() {
       </section>
 
       {/* 6. Why Choose Us / Quality Features */}
-      <section id="why-us" className="bg-emerald text-white py-16">
+      <section id="why-us" className={cn(
+        "py-16 transition-colors duration-500",
+        isLightMode ? "bg-white text-charcoal border-t border-emerald-100" : "bg-emerald text-white"
+      )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="text-xs font-bold text-gold uppercase tracking-widest">{cms.whyBadge}</span>
@@ -791,7 +848,7 @@ export default function Home() {
                 className="font-heading text-2xl sm:text-3xl font-extrabold text-white text-center border border-gold bg-black/50 rounded p-2 w-full mt-1"
               />
             ) : (
-              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white mt-1">
+              <h2 className={cn("font-heading text-3xl sm:text-4xl font-extrabold mt-1", isLightMode ? "text-emerald-950" : "text-white")}>
                 {cms.whyHeading}
               </h2>
             )}
@@ -820,7 +877,10 @@ export default function Home() {
                 descKey: 'why4Desc' as const,
               },
             ].map((f, i) => (
-              <div key={i} className="bg-emerald-900/40 p-6 rounded-2xl border border-emerald-800/50 space-y-3">
+              <div key={i} className={cn(
+                "p-6 rounded-2xl border space-y-3",
+                isLightMode ? "bg-emerald-50/50 border-emerald-100" : "bg-emerald-900/40 border-emerald-800/50"
+              )}>
                 <div className="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center">
                   <f.icon size={24} />
                 </div>
@@ -832,7 +892,7 @@ export default function Home() {
                     className="font-heading font-bold text-base text-white border border-gold bg-black/50 rounded px-2 w-full"
                   />
                 ) : (
-                  <h3 className="font-heading font-bold text-lg text-white">{cms[f.titleKey]}</h3>
+                  <h3 className={cn("font-heading font-bold text-lg", isLightMode ? "text-emerald-950" : "text-white")}>{cms[f.titleKey]}</h3>
                 )}
                 {isEditMode ? (
                   <textarea
@@ -842,7 +902,7 @@ export default function Home() {
                     className="text-xs text-emerald-200/70 border border-gold bg-black/50 rounded p-1.5 w-full"
                   />
                 ) : (
-                  <p className="text-xs text-emerald-200/70 leading-relaxed">{cms[f.descKey]}</p>
+                  <p className={cn("text-xs leading-relaxed", isLightMode ? "text-emerald-800/70" : "text-emerald-200/70")}>{cms[f.descKey]}</p>
                 )}
               </div>
             ))}

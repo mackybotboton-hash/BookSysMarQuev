@@ -4,7 +4,7 @@ const envFile = fs.readFileSync('.env', 'utf-8');
 const env = Object.fromEntries(envFile.split('\n').filter(Boolean).map(line => line.split('=')));
 const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
 async function main() {
-  const { data, error } = await supabase.from('bookings').select('*');
+  const { data, error } = await supabase.from('services').select('name, price, home_service_price');
   if (error) console.error(error);
   console.log(JSON.stringify(data, null, 2));
 }

@@ -32,8 +32,9 @@ export type Database = {
         Row: {
           id: string
           name: string
-          category: 'Hair' | 'Nails' | 'Other'
+          category: string
           price: number
+          home_service_price: number
           estimated_cost: number
           duration_minutes: number
           is_active: boolean
@@ -43,16 +44,18 @@ export type Database = {
         Insert: {
           id?: string
           name: string
-          category: 'Hair' | 'Nails' | 'Other'
+          category: string
           price: number
+          home_service_price?: number
           estimated_cost?: number
           duration_minutes?: number
           is_active?: boolean
         }
         Update: {
           name?: string
-          category?: 'Hair' | 'Nails' | 'Other'
+          category?: string
           price?: number
+          home_service_price?: number
           estimated_cost?: number
           duration_minutes?: number
           is_active?: boolean
@@ -92,7 +95,7 @@ export type Database = {
         Row: {
           id: string
           client_name: string
-          client_phone: string
+          client_phone: string | null
           service_id: string | null
           staff_id: string | null
           booking_date: string
@@ -109,7 +112,7 @@ export type Database = {
         Insert: {
           id?: string
           client_name: string
-          client_phone?: string
+          client_phone?: string | null
           service_id?: string | null
           staff_id?: string | null
           booking_date: string
@@ -123,7 +126,7 @@ export type Database = {
         }
         Update: {
           client_name?: string
-          client_phone?: string
+          client_phone?: string | null
           service_id?: string | null
           staff_id?: string | null
           booking_date?: string

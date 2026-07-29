@@ -65,7 +65,7 @@ export default function PublicBooking() {
     }
   }, [])
 
-  const timeSlots = generateTimeSlots()
+  const timeSlots = generateTimeSlots(8, 21)
 
   // Fetch calendar events for the selected booking date (real-time polling)
   const cleanBookingDate = bookingDate ? bookingDate.split('T')[0].trim() : ''
@@ -181,6 +181,7 @@ export default function PublicBooking() {
         status: 'pending',
         created_by: validCreatedBy,
       })
+      
       setStep('success')
     } catch (err: any) {
       toast.error(err.message || 'Failed to create booking')
@@ -477,19 +478,26 @@ export default function PublicBooking() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                <Phone size={12} className="inline mr-1" /> Mobile Phone Number *
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Phone Number
               </label>
-              <input
-                value={clientPhone}
-                onChange={e => setClientPhone(e.target.value)}
-                placeholder="09XX XXX XXXX"
-                className="input-field"
-                required
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone size={18} className="text-gray-400" />
+                </div>
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  className="pl-10 input-field"
+                  placeholder="09XXXXXXXXX"
+                  required
+                />
+              </div>
             </div>
+
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Special Requests (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requests (optional)</label>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
@@ -502,6 +510,7 @@ export default function PublicBooking() {
                 <ArrowLeft size={14} /> Back
               </button>
               <button
+                type="button"
                 onClick={() => setStep('confirm')}
                 disabled={!clientName || !clientPhone}
                 className="btn-primary text-xs flex items-center gap-1 disabled:opacity-40"
@@ -539,8 +548,8 @@ export default function PublicBooking() {
                 <span className="text-xs text-gray-500">Client Name</span>
                 <span className="text-sm font-medium text-charcoal">{clientName}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-xs text-gray-500">Phone</span>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-500">Phone</span>
                 <span className="text-sm font-medium text-charcoal">{clientPhone}</span>
               </div>
               <div className="border-t border-gray-100 pt-3 flex justify-between items-center">

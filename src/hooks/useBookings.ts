@@ -6,6 +6,7 @@ import { getTodayISO } from '@/lib/utils'
 type BookingInsert = {
   client_name: string
   client_phone?: string
+  client_email?: string | null
   service_id?: string | null
   staff_id?: string | null
   booking_date: string

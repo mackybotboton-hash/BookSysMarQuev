@@ -11,7 +11,8 @@ import { formatCurrency, formatDate, formatTime, formatDuration, getStatusColor,
 import {
   Calendar, Clock, Scissors, User, Phone, LogOut, Plus, CheckCircle,
   Search, MapPin, Bell, SlidersHorizontal, Star, Sparkles, RefreshCw,
-  Home, Bookmark, Compass, X, ArrowRight, Check, AlertTriangle, Palette, Package, Info
+  Home, Bookmark, Compass, X, ArrowRight, Check, AlertTriangle, Palette, Package, Info, Sun, Moon,
+  ChevronRight, BadgeCheck, XCircle, CheckCircle2, Droplets
 } from 'lucide-react'
 import type { Service, Staff } from '@/lib/database.types'
 import { getStaffAvatarIcon } from '@/pages/Staff'
@@ -30,6 +31,16 @@ export default function ClientDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'bookings' | 'profile'>('home')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
 
+  // Light Mode State
+  const [isLightMode, setIsLightMode] = useState(() => {
+    const saved = localStorage.getItem('marquevedo_light_mode')
+    return saved === 'true'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('marquevedo_light_mode', String(isLightMode))
+  }, [isLightMode])
+
   // Quick Booking Modal State (Single-Screen)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
@@ -41,6 +52,8 @@ export default function ClientDashboard() {
   })
   const [bookingTime, setBookingTime] = useState('10:00:00')
   const [bookingNotes, setBookingNotes] = useState('')
+  const [isHomeService, setIsHomeService] = useState(false)
+  const [homeAddress, setHomeAddress] = useState('')
   const [submittingBooking, setSubmittingBooking] = useState(false)
 
   // Handle pre-selected service passed from Home page after authentication
@@ -60,6 +73,12 @@ export default function ClientDashboard() {
   const [cancelModalBookingId, setCancelModalBookingId] = useState<string | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [rebookBookingId, setRebookBookingId] = useState<string | null>(null)
+  
+  // History Filter State
+  const [historySearch, setHistorySearch] = useState('')
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'cancelled'>('all')
+  const [historyDate, setHistoryDate] = useState('')
+  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'confirmed'>('all')
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -375,6 +394,8 @@ export default function ClientDashboard() {
       setSelectedService(services[0])
     }
     setRebookBookingId(existingBookingId || null)
+    setIsHomeService(false)
+    setHomeAddress('')
     queryClient.invalidateQueries({ queryKey: ['dateBookings'] })
     queryClient.invalidateQueries({ queryKey: ['services'] })
     queryClient.invalidateQueries({ queryKey: ['staff'] })
@@ -386,6 +407,11 @@ export default function ClientDashboard() {
     e.preventDefault()
     if (!selectedService || !bookingDate || !bookingTime) {
       toast.error('Please select service, date, and time slot')
+      return
+    }
+
+    if (isHomeService && !homeAddress.trim()) {
+      toast.error('Please provide the exact home address.')
       return
     }
 
@@ -430,6 +456,15 @@ export default function ClientDashboard() {
         }
       }
 
+      let finalNotes = bookingNotes
+      if (isHomeService) {
+        finalNotes = `[HOME SERVICE] Address: ${homeAddress.trim()}\n${finalNotes}`.trim()
+      }
+
+      const basePrice = selectedService.price || 0
+      const homeServiceFee = selectedService.home_service_price || 0
+      const finalPrice = isHomeService ? basePrice + homeServiceFee : basePrice
+
       const newBooking = {
         client_name: profile?.full_name || 'Registered Account',
         client_phone: profile?.phone || '',
@@ -438,8 +473,8 @@ export default function ClientDashboard() {
         booking_date: bookingDate,
         start_time: bookingTime,
         end_time: endTime,
-        total_price: selectedService.price,
-        notes: rebookBookingId ? `[RE-BOOKED] ${bookingNotes || ''}`.trim() : bookingNotes,
+        total_price: finalPrice,
+        notes: rebookBookingId ? `[RE-BOOKED] ${finalNotes || ''}`.trim() : finalNotes,
         status: 'pending',
         created_by: validCreatedBy,
       }
@@ -485,33 +520,40 @@ export default function ClientDashboard() {
     cancelledIds.has(b.id) ? { ...b, status: 'cancelled' } : b
   )
 
-  const upcomingBookings = processedBookings.filter(b => b.status === 'pending' || b.status === 'confirmed') || []
+  const allUpcoming = processedBookings.filter(b => b.status === 'pending' || b.status === 'confirmed') || []
+  const upcomingBookings = upcomingFilter === 'all' ? allUpcoming : allUpcoming.filter(b => b.status === upcomingFilter)
   const pastBookings = processedBookings.filter(b => b.status === 'completed' || b.status === 'cancelled') || []
+
+  // Derive dynamic categories from DB
+  const dbCategories = Array.from(new Set(services?.map(s => s.category) || []))
+  
+  const getCategoryIcon = (cat: string) => {
+    const lower = cat.toLowerCase()
+    if (lower.includes('hair')) return Scissors
+    if (lower.includes('nail')) return Sparkles
+    if (lower.includes('color')) return Palette
+    if (lower.includes('spa') || lower.includes('facial')) return Droplets
+    return Package
+  }
 
   const categories = [
     { id: 'All', category: 'All', icon: Sparkles, label: 'All' },
-    { id: 'Haircut', category: 'Hair', icon: Scissors, label: 'Haircut', keyword: 'cut' },
-    { id: 'Coloring', category: 'Hair', icon: Palette, label: 'Coloring', keyword: 'color' },
-    { id: 'Hair Spa', category: 'Hair', icon: Sparkles, label: 'Hair Spa', keyword: 'spa' },
-    { id: 'Nails', category: 'Nails', icon: Sparkles, label: 'Nails', keyword: 'nail' },
-    { id: 'Treatments', category: 'Other', icon: Package, label: 'Treatments', keyword: 'treatment' },
+    ...dbCategories.map(cat => ({
+      id: cat,
+      category: cat,
+      icon: getCategoryIcon(cat),
+      label: cat,
+    }))
   ]
 
   const filteredServices = services?.filter(s => {
-    const activeCatObj = categories.find(c => c.id === selectedCategory)
-    let matchesCategory = true
-    if (activeCatObj && activeCatObj.id !== 'All') {
-      if (activeCatObj.keyword) {
-        matchesCategory = s.name.toLowerCase().includes(activeCatObj.keyword) || s.category === activeCatObj.category
-      } else {
-        matchesCategory = s.category === activeCatObj.category
-      }
-    }
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = selectedCategory === 'All' ? true : s.category === selectedCategory
+    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          s.category.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesSearch
   }) || []
 
-  const timeSlots = generateTimeSlots()
+  const timeSlots = generateTimeSlots(8, 21)
 
   const handleTabSwitch = (tab: 'home' | 'bookings' | 'profile') => {
     setActiveTab(tab)
@@ -532,9 +574,15 @@ export default function ClientDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#061510] via-[#092219] to-[#040E0A] text-white pb-24 font-body">
+    <div className={cn(
+      "min-h-screen pb-24 font-body transition-colors duration-500",
+      isLightMode ? "bg-offwhite text-charcoal" : "bg-gradient-to-b from-[#061510] via-[#092219] to-[#040E0A] text-white"
+    )}>
       {/* 1. Header Bar */}
-      <header className="sticky top-0 z-40 bg-[#061510]/90 backdrop-blur-md border-b border-gold/10 px-4 py-3">
+      <header className={cn(
+        "sticky top-0 z-40 backdrop-blur-xl border-b px-4 py-3 transition-colors duration-500",
+        isLightMode ? "bg-white/70 border-emerald-100/50" : "bg-[#061510]/90 border-gold/10"
+      )}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
@@ -546,16 +594,29 @@ export default function ClientDashboard() {
               <p className="text-[10px] text-gold uppercase tracking-widest font-semibold flex items-center gap-1">
                 <MapPin size={10} /> Main Salon Branch
               </p>
-              <h1 className="font-heading font-bold text-base text-white">
-                Hello, <span className="text-gold">{profile?.full_name?.split(' ')[0] || 'Valued Client'}</span>
+              <h1 className={cn("font-heading font-bold text-base capitalize", isLightMode ? "text-emerald-950" : "text-white")}>
+                Hello, <span className={cn(isLightMode ? "text-emerald-600" : "text-gold")}>{profile?.full_name?.split(' ')[0] || 'Valued Client'}</span>
               </h1>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setIsLightMode(!isLightMode)}
+              className={cn(
+                "p-2 rounded-full transition-colors flex items-center justify-center",
+                isLightMode ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100" : "bg-white/5 text-gold hover:bg-white/10 border border-gold/20"
+              )}
+              title="Toggle Theme"
+            >
+              {isLightMode ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <button
               onClick={handleLogout}
-              className="p-2 rounded-full bg-white/5 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors flex items-center justify-center"
+              className={cn(
+                "p-2 rounded-full border transition-colors flex items-center justify-center",
+                isLightMode ? "bg-red-50 border-red-200 text-red-500 hover:bg-red-100" : "bg-white/5 border-red-500/20 text-red-400 hover:bg-red-500/20"
+              )}
               title="Sign Out"
             >
               <LogOut size={18} />
@@ -603,23 +664,29 @@ export default function ClientDashboard() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Find & book best services, stylists..."
-                className="w-full pl-11 pr-12 py-3.5 bg-black/40 border border-gold/20 rounded-2xl text-xs text-white placeholder-emerald-200/40 focus:outline-none focus:border-gold/60 shadow-inner"
+                className={cn(
+                  "w-full pl-11 pr-12 py-3.5 border rounded-2xl text-xs focus:outline-none shadow-inner transition-colors",
+                  isLightMode ? "bg-white border-emerald-100 text-charcoal placeholder-gray-400 focus:border-emerald-300" : "bg-black/40 border-gold/20 text-white placeholder-emerald-200/40 focus:border-gold/60"
+                )}
               />
               <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-xl bg-gold/10 text-gold">
                 <SlidersHorizontal size={16} />
               </button>
             </div>
 
-            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-emerald-950 via-emerald-900 to-black border border-gold/30 p-5 shadow-xl">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-gold/10 rounded-full blur-3xl" />
+            <div className={cn(
+              "relative rounded-2xl overflow-hidden border p-5 transition-all duration-300",
+              isLightMode ? "bg-emerald-50 border-emerald-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-1" : "bg-gradient-to-r from-emerald-950 via-emerald-900 to-black border-gold/30 shadow-xl hover:border-gold/50"
+            )}>
+              <div className={cn("absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl", isLightMode ? "bg-emerald-200/50" : "bg-gold/10")} />
               <div className="relative z-10 space-y-2 max-w-xs">
                 <span className="text-[10px] font-bold text-gold bg-gold/15 px-2.5 py-1 rounded-full uppercase tracking-wider">
                   Special Package & Offers
                 </span>
-                <h3 className="font-heading font-extrabold text-xl text-white leading-tight">
+                <h3 className={cn("font-heading font-extrabold text-xl leading-tight", isLightMode ? "text-emerald-950" : "text-white")}>
                   LOOK AWESOME & SAVE 20% DISCOUNT
                 </h3>
-                <p className="text-xs text-emerald-200/80">
+                <p className={cn("text-xs", isLightMode ? "text-emerald-800" : "text-emerald-200/80")}>
                   Hair Color + Rebond Special Combo Package
                 </p>
                 <div className="pt-2 flex items-center gap-3">
@@ -635,7 +702,7 @@ export default function ClientDashboard() {
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-heading font-bold text-base text-white">Top Categories</h3>
+                <h3 className={cn("font-heading font-bold text-base", isLightMode ? "text-emerald-950" : "text-white")}>Top Categories</h3>
                 <span className="text-xs text-gold hover:underline cursor-pointer">View all</span>
               </div>
               <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
@@ -647,7 +714,9 @@ export default function ClientDashboard() {
                       "flex flex-col items-center gap-2 p-3 rounded-2xl min-w-[72px] transition-all border",
                       selectedCategory === cat.id
                         ? "bg-gold/20 border-gold text-gold shadow-lg font-bold"
-                        : "bg-black/30 border-white/5 text-emerald-200 hover:border-gold/30"
+                        : isLightMode 
+                          ? "bg-white border-emerald-100 text-emerald-800 hover:border-emerald-300 shadow-sm"
+                          : "bg-black/30 border-white/10 text-emerald-200 hover:border-gold/30"
                     )}
                   >
                     <div className="w-12 h-12 rounded-full bg-emerald-900/60 border border-gold/20 flex items-center justify-center text-xl shadow-md">
@@ -662,7 +731,7 @@ export default function ClientDashboard() {
             {staffList && staffList.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-heading font-bold text-base text-white">Stylist Specialists</h3>
+                  <h3 className={cn("font-heading font-bold text-base", isLightMode ? "text-emerald-950" : "text-white")}>Stylist Specialists</h3>
                   <span className="text-xs text-gold hover:underline cursor-pointer">View all</span>
                 </div>
                 <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
@@ -672,17 +741,20 @@ export default function ClientDashboard() {
                       <button
                         key={staff.id}
                         onClick={() => { setSelectedStaff(staff); handleOpenBookingModal() }}
-                        className="bg-black/30 border border-gold/15 p-3 rounded-2xl min-w-[130px] text-center space-y-2 flex-shrink-0 hover:border-gold/50 transition-all text-left group"
+                        className={cn(
+                          "p-3 rounded-2xl min-w-[130px] text-center space-y-2 flex-shrink-0 transition-all text-left group border",
+                          isLightMode ? "bg-white border-emerald-100 hover:border-emerald-300 shadow-sm" : "bg-black/30 border-gold/15 hover:border-gold/50"
+                        )}
                       >
                         <div
-                          className="w-14 h-14 rounded-full mx-auto flex items-center justify-center text-white font-bold text-lg ring-2 ring-gold/30 shadow-md transition-transform group-hover:scale-105"
+                          className="w-14 h-14 rounded-full mx-auto flex items-center justify-center text-white font-bold text-xl ring-2 ring-gold/30 shadow-md transition-transform group-hover:scale-105 drop-shadow-sm"
                           style={{ backgroundColor: staff.color_code || '#0A3D2E' }}
                         >
-                          <AvatarIcon size={24} className="text-white drop-shadow-md" />
+                          {staff.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-xs text-white truncate text-center">{staff.name}</p>
-                          <p className="text-[10px] text-emerald-300/70 truncate text-center">{(staff as any).specialty || 'Senior Stylist'}</p>
+                          <p className={cn("font-bold text-xs truncate text-center capitalize", isLightMode ? "text-emerald-950" : "text-white")}>{staff.name}</p>
+                          <p className={cn("text-[10px] truncate text-center", isLightMode ? "text-emerald-700" : "text-emerald-300/70")}>{(staff as any).specialty || 'Senior Stylist'}</p>
                         </div>
                         <div className="flex items-center justify-center gap-1 text-[10px] text-gold font-semibold">
                           <Star size={10} className="fill-gold" /> 4.9
@@ -696,7 +768,7 @@ export default function ClientDashboard() {
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-heading font-bold text-base text-white">Popular Salon Treatments</h3>
+                <h3 className={cn("font-heading font-bold text-base", isLightMode ? "text-emerald-950" : "text-white")}>Popular Salon Treatments</h3>
                 <span className="text-xs text-gold hover:underline cursor-pointer">View all</span>
               </div>
 
@@ -704,16 +776,19 @@ export default function ClientDashboard() {
                 {filteredServices.map((service) => (
                   <div
                     key={service.id}
-                    className="bg-black/40 border border-emerald-800/40 p-4 rounded-2xl flex items-center justify-between hover:border-gold/40 transition-all group"
+                    className={cn(
+                      "p-4 rounded-2xl flex items-center justify-between transition-all group border",
+                      isLightMode ? "bg-white border-emerald-100 hover:border-emerald-300 shadow-sm" : "bg-black/40 border-emerald-800/40 hover:border-gold/40"
+                    )}
                   >
                     <div className="space-y-1">
                       <span className="text-[9px] font-bold text-gold uppercase tracking-wider bg-gold/10 px-2 py-0.5 rounded-md">
                         {service.category}
                       </span>
-                      <h4 className="font-bold text-sm text-white group-hover:text-gold transition-colors">
+                      <h4 className={cn("font-bold text-sm transition-colors", isLightMode ? "text-emerald-950 group-hover:text-emerald-600" : "text-white group-hover:text-gold")}>
                         {service.name}
                       </h4>
-                      <div className="flex items-center gap-3 text-[11px] text-emerald-200/70">
+                      <div className={cn("flex items-center gap-3 text-[11px]", isLightMode ? "text-emerald-900 font-medium" : "text-emerald-200/70")}>
                         <span className="flex items-center gap-1">
                           <Clock size={11} /> {formatDuration(service.duration_minutes)}
                         </span>
@@ -743,10 +818,10 @@ export default function ClientDashboard() {
 
         {/* TAB 2: MY BOOKINGS */}
         {activeTab === 'bookings' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
             <div className="flex items-center justify-between">
-              <h2 className="font-heading font-bold text-xl text-white flex items-center gap-2">
-                <Calendar size={20} className="text-gold" /> My Appointments
+              <h2 className={cn("font-heading font-bold text-xl flex items-center gap-2", isLightMode ? "text-emerald-950" : "text-white")}>
+                <Calendar size={20} className={cn(isLightMode ? "text-amber-600" : "text-gold")} /> My Appointments
               </h2>
               <button
                 onClick={() => handleOpenBookingModal()}
@@ -757,7 +832,25 @@ export default function ClientDashboard() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-xs font-bold text-gold uppercase tracking-wider">UPCOMING ({upcomingBookings.length})</h3>
+              <div className="flex items-center justify-between">
+                <h3 className={cn("text-xs font-bold uppercase tracking-wider", isLightMode ? "text-amber-600" : "text-gold")}>
+                  UPCOMING ({allUpcoming.length})
+                </h3>
+                <div className={cn("flex items-center gap-1 p-0.5 rounded-lg border", isLightMode ? "bg-gray-100 border-gray-200" : "bg-black/30 border-white/10")}>
+                  <button 
+                    onClick={() => setUpcomingFilter('all')} 
+                    className={cn("px-3 py-1 text-[10px] font-bold rounded-md transition-all", upcomingFilter === 'all' ? (isLightMode ? "bg-amber-500 text-white" : "bg-gold text-black") : (isLightMode ? "text-gray-500 hover:text-amber-600" : "text-gray-400 hover:text-white"))}
+                  >
+                    All
+                  </button>
+                  <button 
+                    onClick={() => setUpcomingFilter('confirmed')} 
+                    className={cn("px-3 py-1 text-[10px] font-bold rounded-md transition-all", upcomingFilter === 'confirmed' ? (isLightMode ? "bg-amber-500 text-white" : "bg-gold text-black") : (isLightMode ? "text-gray-500 hover:text-amber-600" : "text-gray-400 hover:text-white"))}
+                  >
+                    Confirmed
+                  </button>
+                </div>
+              </div>
 
               {bookingsLoading ? (
                 <div className="space-y-2">
@@ -765,17 +858,17 @@ export default function ClientDashboard() {
                   <div className="h-20 bg-white/5 rounded-2xl animate-pulse" />
                 </div>
               ) : upcomingBookings.length === 0 ? (
-                <div className="bg-black/30 border border-emerald-800/40 p-8 rounded-2xl text-center space-y-2">
-                  <CheckCircle size={36} className="text-gold/40 mx-auto" />
-                  <p className="font-medium text-sm text-gray-300">No active upcoming appointments</p>
-                  <p className="text-xs text-emerald-200/60">Schedule your next hair or nail service now.</p>
+                <div className={cn("p-8 rounded-2xl text-center space-y-2 border", isLightMode ? "bg-white border-emerald-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]" : "bg-black/30 border-emerald-800/40")}>
+                  <CheckCircle size={36} className={cn("mx-auto", isLightMode ? "text-amber-600/50" : "text-gold/40")} />
+                  <p className={cn("font-medium text-sm", isLightMode ? "text-charcoal" : "text-gray-300")}>No active upcoming appointments</p>
+                  <p className={cn("text-xs", isLightMode ? "text-emerald-800/70" : "text-emerald-200/60")}>Schedule your next hair or nail service now.</p>
                   <button onClick={() => handleOpenBookingModal()} className="btn-gold inline-flex text-xs py-2 px-4 mt-2 font-bold">
                     Book Appointment
                   </button>
                 </div>
               ) : (
                 upcomingBookings.map((b: any, idx: number) => (
-                  <div key={b.id ? `upcoming-${b.id}-${idx}` : `upcoming-${idx}`} className="bg-black/40 border border-gold/20 p-4 rounded-2xl space-y-3">
+                  <div key={b.id ? `upcoming-${b.id}-${idx}` : `upcoming-${idx}`} className={cn("p-4 rounded-2xl space-y-3 border transition-all duration-300", isLightMode ? "bg-white border-emerald-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-1" : "bg-black/40 border-gold/20 hover:border-gold/50")}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div
@@ -785,40 +878,53 @@ export default function ClientDashboard() {
                           {b.services?.name?.charAt(0) || 'S'}
                         </div>
                         <div>
-                          <h4 className="font-bold text-white text-sm">{b.services?.name}</h4>
-                          <p className="text-xs text-emerald-200/70">Stylist: {b.staff?.name || 'Any Available'}</p>
+                          <h4 className={cn("font-bold text-sm", isLightMode ? "text-emerald-950" : "text-white")}>{b.services?.name}</h4>
+                          <p className={cn("text-xs capitalize", isLightMode ? "text-emerald-700" : "text-emerald-200/70")}>Stylist: {b.staff?.name || 'Any Available'}</p>
                         </div>
                       </div>
-                      <span className={cn('text-[11px] px-2.5 py-1 rounded-full font-semibold capitalize', getStatusColor(b.status))}>
+                      <span className={cn('text-[11px] px-2.5 py-1 rounded-full font-semibold capitalize flex items-center gap-1.5', getStatusColor(b.status))}>
+                        {b.status === 'completed' ? <CheckCircle2 size={12} /> : b.status === 'cancelled' ? <XCircle size={12} /> : b.status === 'confirmed' ? <Check size={12} /> : <Clock size={12} />}
                         {b.status}
                       </span>
                     </div>
 
-                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-emerald-200/80">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1 font-medium">
-                            <Calendar size={12} className="text-gold" /> {formatDate(b.booking_date)}
-                          </span>
-                          <span className="flex items-center gap-1 font-medium">
-                            <Clock size={12} className="text-gold" /> {formatTime(b.start_time)}
+                    <div className={cn("pt-2 border-t flex flex-col gap-2", isLightMode ? "border-emerald-50 text-emerald-950 font-medium" : "border-white/5 text-emerald-200/80")}>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1 font-medium">
+                              <Calendar size={12} className={cn(isLightMode ? "text-amber-600" : "text-gold")} /> {formatDate(b.booking_date)}
+                            </span>
+                            <span className="flex items-center gap-1 font-medium">
+                              <Clock size={12} className={cn(isLightMode ? "text-amber-600" : "text-gold")} /> {formatTime(b.start_time)}
+                            </span>
+                          </div>
+                          <span className="hidden sm:inline text-white/20">•</span>
+                          <span className={cn("text-[10px]", isLightMode ? "text-emerald-800/80 font-medium" : "text-emerald-200/50")}>
+                            Booked: {new Date(b.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </span>
                         </div>
-                        <span className="hidden sm:inline text-white/20">•</span>
-                        <span className="text-[10px] text-emerald-200/50">
-                          Booked: {new Date(b.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className={cn("font-heading font-bold text-sm", isLightMode ? "text-amber-600" : "text-gold")}>{formatCurrency(b.total_price)}</span>
+                          <button
+                            onClick={() => setCancelModalBookingId(b.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider uppercase text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-md transition-colors w-full sm:w-auto justify-center"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Cancel
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-heading font-bold text-gold text-sm">{formatCurrency(b.total_price)}</span>
-                        <button
-                          onClick={() => setCancelModalBookingId(b.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-wider uppercase text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-md transition-colors w-full sm:w-auto justify-center"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          Cancel
-                        </button>
-                      </div>
+                      
+                      {b.notes?.includes('[HOME SERVICE]') && (
+                        <div className={cn("px-2.5 py-2 rounded-lg flex items-start gap-2", isLightMode ? "bg-amber-50 text-amber-900 border border-amber-200" : "bg-gold/10 text-gold border border-gold/20")}>
+                          <Home size={14} className="shrink-0 mt-0.5" />
+                          <span className="text-[11px] leading-tight break-words">
+                            <span className="font-bold uppercase tracking-wider block mb-0.5">Home Service</span>
+                            {b.notes.replace('[HOME SERVICE]', '').trim().replace(/^Address:\s*/, '')}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -826,50 +932,101 @@ export default function ClientDashboard() {
             </div>
 
             {pastBookings.length > 0 && (
-              <div className="space-y-3 pt-4 border-t border-emerald-800/40">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Past History ({pastBookings.length})</h3>
+              <div className={cn("space-y-3 pt-4 border-t", isLightMode ? "border-emerald-100" : "border-emerald-800/40")}>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Past History ({pastBookings.length})</h3>
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <div className="relative flex-1 w-full sm:w-48">
+                      <Search className={cn("absolute left-2.5 top-1/2 -translate-y-1/2", isLightMode ? "text-emerald-700/50" : "text-gray-400")} size={14} />
+                      <input
+                        type="text"
+                        placeholder="Search history..."
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                        className={cn("w-full pl-8 pr-3 py-1.5 text-[11px] font-medium border rounded-lg focus:outline-none", isLightMode ? "bg-white border-emerald-100 text-emerald-950 focus:border-amber-500" : "bg-black/40 border-gold/20 text-white focus:border-gold")}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <input
+                        type="date"
+                        value={historyDate}
+                        onChange={(e) => setHistoryDate(e.target.value)}
+                        className={cn("py-1.5 px-2 flex-1 sm:flex-none text-[11px] font-medium border rounded-lg focus:outline-none cursor-pointer", isLightMode ? "bg-white border-emerald-100 text-emerald-950 focus:border-amber-500" : "bg-black/40 border-gold/20 text-white focus:border-gold")}
+                        title="Filter by date"
+                      />
+                      <select
+                        value={historyFilter}
+                        onChange={(e) => setHistoryFilter(e.target.value as any)}
+                        className={cn("py-1.5 px-2 flex-1 sm:flex-none text-[11px] font-medium border rounded-lg focus:outline-none appearance-none cursor-pointer", isLightMode ? "bg-white border-emerald-100 text-emerald-950 focus:border-amber-500" : "bg-black/40 border-gold/20 text-white focus:border-gold")}
+                      >
+                        <option value="all">All Status</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  {pastBookings.map((b: any, idx: number) => (
-                    <div key={b.id ? `past-${b.id}-${idx}` : `past-${idx}`} className="bg-black/20 border border-white/5 p-3 rounded-xl flex flex-col text-xs">
+                  {pastBookings.filter((b: any) => {
+                    const matchesSearch = b.services?.name?.toLowerCase().includes(historySearch.toLowerCase()) || b.notes?.toLowerCase().includes(historySearch.toLowerCase());
+                    const matchesFilter = historyFilter === 'all' || b.status === historyFilter;
+                    const matchesDate = !historyDate || b.booking_date === historyDate;
+                    return matchesSearch && matchesFilter && matchesDate;
+                  }).map((b: any, idx: number) => (
+                    <div key={b.id ? `past-${b.id}-${idx}` : `past-${idx}`} className={cn("p-3 rounded-xl flex flex-col text-xs border transition-all duration-300", isLightMode ? "bg-white border-emerald-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-1" : "bg-black/20 border-white/10 hover:border-gold/30")}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-semibold text-white">{b.services?.name}</p>
-                          <p className="text-[11px] text-gray-400">{formatDate(b.booking_date)} • {formatTime(b.start_time)}</p>
-                          <p className="text-[9px] text-emerald-200/50 mt-0.5">Booked: {new Date(b.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+                          <p className={cn("font-semibold", isLightMode ? "text-emerald-950" : "text-white")}>{b.services?.name}</p>
+                          <p className={cn("text-[11px]", isLightMode ? "text-emerald-900 font-medium" : "text-gray-400")}>{formatDate(b.booking_date)} • {formatTime(b.start_time)}</p>
+                          <p className={cn("text-[9px] mt-0.5", isLightMode ? "text-emerald-800/80 font-medium" : "text-emerald-200/50")}>Booked: {new Date(b.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium', getStatusColor(b.status))}>
+                          <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium capitalize flex items-center gap-1', getStatusColor(b.status))}>
+                            {b.status === 'completed' ? <CheckCircle2 size={10} /> : b.status === 'cancelled' ? <XCircle size={10} /> : b.status === 'confirmed' ? <Check size={10} /> : <Clock size={10} />}
                             {b.status}
                           </span>
-                          <span className="font-bold text-gold">{formatCurrency(b.total_price)}</span>
-                          {ratedIds.includes(b.id) ? (
-                            <span className="text-[10px] bg-gold/15 text-gold px-2.5 py-1 rounded-full font-bold border border-gold/30 flex items-center gap-1">
-                              <Star size={10} className="fill-gold" /> Rated
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenRatingModal(b)}
-                              className="btn-gold text-[10px] py-1 px-2.5 font-bold shadow-sm flex items-center gap-1"
-                            >
-                              <Star size={10} className="fill-gold" /> Rate & Review
-                            </button>
+                          <span className={cn("font-bold", isLightMode ? "text-amber-600" : "text-gold")}>{formatCurrency(b.total_price)}</span>
+                          {b.status === 'completed' && (
+                            ratedIds.includes(b.id) ? (
+                              <span className={cn("text-[10px] px-2.5 py-1 rounded-full font-bold border flex items-center gap-1", isLightMode ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-gold/15 text-gold border-gold/30")}>
+                                <Star size={10} className={cn(isLightMode ? "fill-amber-500 text-amber-500" : "fill-gold text-gold")} /> Rated
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenRatingModal(b)}
+                                className="btn-gold text-[10px] py-1 px-2.5 font-bold shadow-sm flex items-center gap-1"
+                              >
+                                <Star size={10} className="fill-gold" /> Rate & Review
+                              </button>
+                            )
                           )}
                           <button
                             onClick={() => handleOpenBookingModal(b.services, b.id)}
-                            className="text-emerald-200/70 hover:text-gold text-[11px] font-medium flex items-center gap-1"
+                            className={cn("text-[11px] font-medium flex items-center gap-1", isLightMode ? "text-emerald-500 hover:text-amber-600" : "text-emerald-200/70 hover:text-gold")}
                           >
                             <RefreshCw size={10} /> Re-book
                           </button>
                         </div>
                       </div>
-                      {b.status === 'cancelled' && b.cancellation_reason && (
-                        <div className="bg-red-950/20 border border-red-900/30 rounded-lg p-3 mt-3">
-                          <div className="flex items-start gap-2">
-                            <Info className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                            <div className="text-sm">
-                              <span className="font-semibold text-red-400">Cancellation Reason: </span>
-                              <span className="text-gray-300 italic">{b.cancellation_reason}</span>
+                      {b.status === 'cancelled' && b.cancellation_reason && b.cancellation_reason.trim() !== '' && (
+                        <div className={cn("border rounded-md px-2.5 py-2 mt-2", isLightMode ? "bg-red-50 border-red-200" : "bg-red-950/20 border-red-900/30")}>
+                          <div className="flex items-start gap-1.5">
+                            <Info className={cn("w-3.5 h-3.5 shrink-0 mt-[1px]", isLightMode ? "text-red-500" : "text-red-400")} />
+                            <div className="text-[11px] leading-tight">
+                              <span className={cn("font-semibold", isLightMode ? "text-red-700" : "text-red-400")}>Cancellation Reason: </span>
+                              <span className={cn("italic", isLightMode ? "text-red-900" : "text-gray-300")}>{b.cancellation_reason}</span>
                             </div>
+                          </div>
+                        </div>
+                      )}
+                      {b.notes?.includes('[HOME SERVICE]') && (
+                        <div className={cn("border rounded-md px-2.5 py-2 mt-2 flex items-start gap-1.5", isLightMode ? "bg-amber-50 border-amber-200" : "bg-gold/10 border-gold/30")}>
+                          <Home className={cn("w-3.5 h-3.5 shrink-0 mt-[1px]", isLightMode ? "text-amber-600" : "text-gold")} />
+                          <div className="text-[11px] leading-tight">
+                            <span className={cn("font-bold uppercase tracking-wider", isLightMode ? "text-amber-800" : "text-gold")}>Home Service: </span>
+                            <span className={cn("italic", isLightMode ? "text-amber-900" : "text-gray-300")}>{b.notes.replace('[HOME SERVICE]', '').trim().replace(/^Address:\s*/, '')}</span>
                           </div>
                         </div>
                       )}
@@ -883,34 +1040,34 @@ export default function ClientDashboard() {
 
         {/* TAB 3: PROFILE */}
         {activeTab === 'profile' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="bg-black/40 border border-gold/20 p-6 rounded-2xl text-center space-y-3">
+          <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+            <div className={cn("p-6 rounded-2xl text-center space-y-3 border", isLightMode ? "bg-white border-emerald-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]" : "bg-black/40 border-gold/20")}>
               <div className="w-20 h-20 rounded-full bg-emerald-900 border-2 border-gold mx-auto flex items-center justify-center font-bold text-2xl text-gold shadow-lg">
                 {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'C'}
               </div>
               <div>
-                <h2 className="font-heading font-bold text-xl text-white">{profile?.full_name || 'Client Account'}</h2>
-                <p className="text-xs text-emerald-200/80">{profile?.email || 'Registered User'}</p>
+                <h2 className={cn("font-heading font-bold text-xl capitalize", isLightMode ? "text-emerald-950" : "text-white")}>{profile?.full_name || 'Client Account'}</h2>
+                <p className={cn("text-xs", isLightMode ? "text-emerald-700" : "text-emerald-200/80")}>{profile?.email || 'Registered User'}</p>
                 {profile?.phone && <p className="text-xs text-gold font-semibold mt-1 flex items-center justify-center gap-1"><Phone size={12} /> {profile.phone}</p>}
                 {profile?.location && <p className="text-[11px] text-gray-400 mt-0.5 flex items-center justify-center gap-1"><MapPin size={10} /> {profile.location}</p>}
-                <span className="inline-block mt-3 text-[10px] font-bold text-gold uppercase bg-gold/15 px-3 py-1 rounded-full border border-gold/30">
-                  Verified Client Account
+                <span className="inline-flex mt-3 text-[10px] font-bold text-gold uppercase bg-gold/15 px-3 py-1 rounded-full border border-gold/30 items-center gap-1">
+                  <BadgeCheck size={12} className="text-gold" /> Verified Client Account
                 </span>
               </div>
             </div>
 
-            <div className="bg-black/30 border border-white/5 rounded-2xl overflow-hidden divide-y divide-white/5 text-sm">
-              <button onClick={() => setActiveTab('bookings')} className="w-full p-4 text-left flex items-center justify-between text-white hover:bg-white/5">
+            <div className={cn("rounded-2xl overflow-hidden divide-y text-sm border", isLightMode ? "bg-white border-emerald-100 divide-emerald-50 shadow-sm" : "bg-black/30 border-white/10 divide-white/10")}>
+              <button onClick={() => setActiveTab('bookings')} className={cn("w-full p-4 text-left flex items-center justify-between", isLightMode ? "text-emerald-950 hover:bg-emerald-50" : "text-white hover:bg-white/5")}>
                 <span className="flex items-center gap-3"><Calendar size={16} className="text-gold" /> My Appointments</span>
-                <span className="text-xs text-gray-400">→</span>
+                <ChevronRight size={16} className="text-gray-400" />
               </button>
-              <button onClick={() => handleOpenBookingModal()} className="w-full p-4 text-left flex items-center justify-between text-white hover:bg-white/5">
+              <button onClick={() => handleOpenBookingModal()} className={cn("w-full p-4 text-left flex items-center justify-between", isLightMode ? "text-emerald-950 hover:bg-emerald-50" : "text-white hover:bg-white/5")}>
                 <span className="flex items-center gap-3"><Plus size={16} className="text-gold" /> Book New Service</span>
-                <span className="text-xs text-gray-400">→</span>
+                <ChevronRight size={16} className="text-gray-400" />
               </button>
-              <button onClick={handleLogout} className="w-full p-4 text-left flex items-center justify-between text-red-400 hover:bg-red-500/10">
-                <span className="flex items-center gap-3"><LogOut size={16} /> Sign Out</span>
-                <span className="text-xs text-red-400">→</span>
+              <button onClick={() => handleLogout()} className={cn("w-full p-4 text-left flex items-center justify-between", isLightMode ? "text-red-600 hover:bg-red-50" : "text-red-400 hover:bg-red-500/10")}>
+                <span className="flex items-center gap-3"><LogOut size={16} className="text-red-400" /> Sign Out</span>
+                <ChevronRight size={16} className="text-gray-400" />
               </button>
             </div>
           </div>
@@ -919,16 +1076,16 @@ export default function ClientDashboard() {
 
       {/* 4. Single-Screen Quick Book Appointment Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gradient-to-b from-[#0B251C] via-[#091E17] to-[#040E0A] text-white rounded-3xl border border-gold/30 w-full max-w-lg overflow-hidden shadow-2xl animate-scale-in my-auto">
-            <div className="p-5 border-b border-gold/20 flex items-center justify-between bg-black/40">
+        <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto backdrop-blur-md transition-colors", isLightMode ? "bg-white/60" : "bg-black/85")}>
+          <div className={cn("rounded-3xl border w-full max-w-lg overflow-hidden animate-scale-in my-auto transition-colors", isLightMode ? "bg-white border-emerald-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)]" : "bg-gradient-to-b from-[#0B251C] via-[#091E17] to-[#040E0A] text-white border-gold/30 shadow-2xl")}>
+            <div className={cn("p-5 border-b flex items-center justify-between", isLightMode ? "bg-emerald-50 border-emerald-100" : "border-gold/20 bg-black/40")}>
               <div className="flex items-center gap-2">
-                <Scissors size={20} className="text-gold" />
-                <h3 className="font-heading font-bold text-lg text-white">Book Appointment</h3>
+                <Scissors size={20} className={cn(isLightMode ? "text-amber-600" : "text-gold")} />
+                <h3 className={cn("font-heading font-bold text-lg", isLightMode ? "text-emerald-950" : "text-white")}>Book Appointment</h3>
               </div>
               <button
                 onClick={() => { setShowBookingModal(false); setRebookBookingId(null); }}
-                className="p-1.5 rounded-full bg-white/10 text-gray-300 hover:text-white"
+                className={cn("p-1.5 rounded-full transition-colors", isLightMode ? "bg-black/5 hover:bg-black/10 text-gray-500" : "bg-white/10 text-gray-300 hover:text-white")}
               >
                 <X size={18} />
               </button>
@@ -936,11 +1093,24 @@ export default function ClientDashboard() {
 
             <form onSubmit={handleQuickBookSubmit} className="p-5 space-y-4 text-xs">
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="font-bold text-gold uppercase tracking-wider text-[11px]">Choose Your Service</label>
-                  <span className="font-heading font-extrabold text-base text-gold">
-                    Total: {formatCurrency(selectedService?.price || 0)}
-                  </span>
+                <div className="flex justify-between items-start">
+                  <label className={cn("font-bold uppercase tracking-wider text-[11px]", isLightMode ? "text-amber-600" : "text-gold")}>Choose Your Service</label>
+                  <div className="text-right">
+                    {isHomeService && (selectedService?.home_service_price || 0) > 0 ? (
+                      <>
+                        <div className={cn("text-[10px] font-medium opacity-80", isLightMode ? "text-emerald-700" : "text-emerald-200")}>
+                          {formatCurrency(selectedService?.price || 0)} + {formatCurrency(selectedService?.home_service_price || 0)} (Home)
+                        </div>
+                        <span className={cn("font-heading font-extrabold text-base block mt-0.5", isLightMode ? "text-amber-600" : "text-gold")}>
+                          Total: {formatCurrency((selectedService?.price || 0) + (selectedService?.home_service_price || 0))}
+                        </span>
+                      </>
+                    ) : (
+                      <span className={cn("font-heading font-extrabold text-base", isLightMode ? "text-amber-600" : "text-gold")}>
+                        Total: {formatCurrency(selectedService?.price || 0)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <select
                   value={selectedService?.id || ''}
@@ -948,11 +1118,11 @@ export default function ClientDashboard() {
                     const s = services?.find(item => item.id === e.target.value)
                     if (s) setSelectedService(s)
                   }}
-                  className="w-full py-3 px-4 bg-black/60 border border-gold/30 rounded-xl text-white font-medium text-xs focus:outline-none focus:border-gold"
+                  className={cn("w-full py-3 px-4 border rounded-xl font-medium text-xs focus:outline-none transition-colors", isLightMode ? "bg-white border-emerald-200 text-emerald-950 focus:border-amber-500" : "bg-black/60 border-gold/30 text-white focus:border-gold")}
                   required
                 >
                   {services?.map(s => (
-                    <option key={s.id} value={s.id} className="bg-[#0B251C] text-white">
+                    <option key={s.id} value={s.id} className={cn(isLightMode ? "bg-white text-emerald-950" : "bg-[#0B251C] text-white")}>
                       {s.name} ({formatDuration(s.duration_minutes)}) — {formatCurrency(s.price)}
                     </option>
                   ))}
@@ -960,7 +1130,7 @@ export default function ClientDashboard() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-gold uppercase tracking-wider text-[11px]">Select Specialist Stylist</label>
+                <label className={cn("font-bold uppercase tracking-wider text-[11px]", isLightMode ? "text-amber-600" : "text-gold")}>Select Specialist Stylist</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -968,8 +1138,8 @@ export default function ClientDashboard() {
                     className={cn(
                       "p-2.5 rounded-xl border text-center font-medium transition-all flex flex-col items-center gap-1",
                       selectedStaff === null
-                        ? "bg-gold text-[#061510] border-gold shadow-md font-bold"
-                        : "bg-black/40 border-white/10 text-emerald-200 hover:border-gold/30"
+                        ? isLightMode ? "bg-amber-100 text-amber-900 border-amber-400 shadow-sm font-bold" : "bg-gold text-[#061510] border-gold shadow-md font-bold"
+                        : isLightMode ? "bg-white border-emerald-100 text-emerald-700 hover:border-emerald-300" : "bg-black/40 border-white/10 text-emerald-200 hover:border-gold/30"
                     )}
                   >
                     <span>Any Stylist</span>
@@ -984,8 +1154,8 @@ export default function ClientDashboard() {
                       className={cn(
                         "p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1 truncate",
                         selectedStaff?.id === staff.id
-                          ? "bg-gold text-[#061510] border-gold shadow-md font-bold"
-                          : "bg-black/40 border-white/10 text-emerald-200 hover:border-gold/30"
+                          ? isLightMode ? "bg-amber-100 text-amber-900 border-amber-400 shadow-sm font-bold" : "bg-gold text-[#061510] border-gold shadow-md font-bold"
+                          : isLightMode ? "bg-white border-emerald-100 text-emerald-700 hover:border-emerald-300" : "bg-black/40 border-white/10 text-emerald-200 hover:border-gold/30"
                       )}
                     >
                       <span className="truncate w-full">{staff.name}</span>
@@ -996,7 +1166,7 @@ export default function ClientDashboard() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-gold uppercase tracking-wider text-[11px] flex items-center gap-1">
+                <label className={cn("font-bold uppercase tracking-wider text-[11px] flex items-center gap-1", isLightMode ? "text-amber-600" : "text-gold")}>
                   <Calendar size={12} /> Select Date (Opens Calendar) *
                 </label>
                 <div className="relative">
@@ -1005,7 +1175,7 @@ export default function ClientDashboard() {
                     value={bookingDate}
                     onChange={(e) => setBookingDate(e.target.value)}
                     min={getTodayISO()}
-                    className="w-full py-3 px-4 bg-black/60 border border-gold/30 rounded-xl text-white font-medium text-xs focus:outline-none focus:border-gold cursor-pointer input-dark"
+                    className={cn("w-full py-3 px-4 border rounded-xl font-medium text-xs focus:outline-none cursor-pointer", isLightMode ? "bg-white border-emerald-200 text-emerald-950 focus:border-amber-500" : "bg-black/60 border-gold/30 text-white focus:border-gold input-dark")}
                     required
                   />
                 </div>
@@ -1049,10 +1219,10 @@ export default function ClientDashboard() {
                 {!isWholeDayBlocked && (
                   <>
                     <div className="flex justify-between items-center">
-                      <label className="font-bold text-gold uppercase tracking-wider text-[11px]">
+                      <label className={cn("font-bold uppercase tracking-wider text-[11px]", isLightMode ? "text-amber-600" : "text-gold")}>
                         Select Available Time Slot
                       </label>
-                      <span className="text-[10px] text-emerald-300/70">
+                      <span className={cn("text-[10px]", isLightMode ? "text-emerald-500" : "text-emerald-300/70")}>
                         {dateBookings?.length || 0} slots taken today
                       </span>
                     </div>
@@ -1074,10 +1244,10 @@ export default function ClientDashboard() {
                               isEventBlocked
                                 ? "bg-amber-950/60 text-amber-500/70 border-amber-500/30 cursor-not-allowed opacity-60"
                                 : isBooked
-                                ? "bg-gray-800/60 text-gray-500 border-gray-700/40 cursor-not-allowed line-through opacity-50"
+                                ? isLightMode ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed line-through opacity-70" : "bg-gray-800/60 text-gray-500 border-gray-700/40 cursor-not-allowed line-through opacity-50"
                                 : bookingTime === slot
-                                ? "bg-gold text-[#061510] border-gold shadow-md font-bold"
-                                : "bg-black/40 text-emerald-200 border-white/10 hover:border-gold/30"
+                                ? isLightMode ? "bg-amber-100 text-amber-900 border-amber-400 shadow-sm font-bold" : "bg-gold text-[#061510] border-gold shadow-md font-bold"
+                                : isLightMode ? "bg-white text-emerald-700 border-emerald-100 hover:border-emerald-300" : "bg-black/40 text-emerald-200 border-white/10 hover:border-gold/30"
                             )}
                             title={
                               isEventBlocked
@@ -1098,14 +1268,42 @@ export default function ClientDashboard() {
                 )}
               </div>
 
-              <div className="bg-black/40 p-3 rounded-xl border border-gold/20 space-y-1">
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-gray-400">Client Name:</span>
-                  <span className="font-bold text-gold">{profile?.full_name || 'Registered Account'}</span>
+              <div className={cn("p-3 rounded-xl border space-y-3", isLightMode ? "bg-emerald-50 border-emerald-100" : "bg-black/40 border-gold/20")}>
+                
+                <div className={cn("flex items-center justify-between pb-3", !isHomeService && "border-b", isLightMode ? "border-emerald-200/50" : "border-white/10")}>
+                  <div>
+                    <p className={cn("font-bold text-xs", isLightMode ? "text-emerald-950" : "text-white")}>Home Service</p>
+                    <p className={cn("text-[10px]", isLightMode ? "text-emerald-700" : "text-gray-400")}>Will this be a home service appointment?</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={isHomeService} onChange={() => setIsHomeService(!isHomeService)} />
+                    <div className={cn("w-9 h-5 bg-gray-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all", isLightMode ? "peer-checked:bg-amber-500" : "peer-checked:bg-gold")}></div>
+                  </label>
                 </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-gray-400">Mobile Phone:</span>
-                  <span className="font-bold text-white">{profile?.phone || '0917 123 4567'}</span>
+
+                {isHomeService && (
+                  <div className={cn("pb-3 border-b animate-scale-in", isLightMode ? "border-emerald-200/50" : "border-white/10")}>
+                    <label className={cn("font-bold uppercase tracking-wider text-[10px] mb-1.5 block", isLightMode ? "text-amber-600" : "text-gold")}>Exact Home Address *</label>
+                    <textarea
+                      value={homeAddress}
+                      onChange={e => setHomeAddress(e.target.value)}
+                      placeholder="e.g. 123 Main St, Brgy. San Jose, Block 4 Lot 2"
+                      className={cn("w-full p-2.5 rounded-lg text-xs resize-none border focus:outline-none transition-colors", isLightMode ? "bg-white border-emerald-200 focus:border-amber-500 text-emerald-950" : "bg-black/40 border-gold/30 focus:border-gold text-white")}
+                      rows={2}
+                      required={isHomeService}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className={cn(isLightMode ? "text-emerald-700" : "text-gray-400")}>Client Name:</span>
+                    <span className={cn("font-bold", isLightMode ? "text-amber-600" : "text-gold")}>{profile?.full_name || 'Registered Account'}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className={cn(isLightMode ? "text-emerald-700" : "text-gray-400")}>Mobile Phone:</span>
+                    <span className={cn("font-bold", isLightMode ? "text-emerald-950" : "text-white")}>{profile?.phone || '0917 123 4567'}</span>
+                  </div>
                 </div>
               </div>
 
@@ -1190,14 +1388,17 @@ export default function ClientDashboard() {
         </div>
       )}
 
-      {/* 5. Bottom Mobile Floating Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#061510]/95 backdrop-blur-lg border-t border-gold/20 py-2.5 px-6">
-        <div className="max-w-md mx-auto flex items-center justify-around">
+      {/* 5. Bottom Navigation */}
+      <nav className={cn(
+        "fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t pb-safe transition-colors duration-500",
+        isLightMode ? "bg-white/70 border-emerald-100/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]" : "bg-[#061510]/95 border-gold/10"
+      )}>
+        <div className="max-w-4xl mx-auto flex items-center justify-around h-16 px-6">
           <button
             onClick={() => handleTabSwitch('home')}
             className={cn(
               "flex flex-col items-center gap-1 text-[11px] font-medium transition-colors",
-              activeTab === 'home' ? "text-gold" : "text-emerald-200/50 hover:text-white"
+              activeTab === 'home' ? "text-gold" : isLightMode ? "text-emerald-300 hover:text-emerald-600" : "text-emerald-200/50 hover:text-white"
             )}
           >
             <Home size={20} />
@@ -1208,29 +1409,33 @@ export default function ClientDashboard() {
             onClick={() => handleTabSwitch('bookings')}
             className={cn(
               "flex flex-col items-center gap-1 text-[11px] font-medium transition-colors relative",
-              activeTab === 'bookings' ? "text-gold" : "text-emerald-200/50 hover:text-white"
+              activeTab === 'bookings' ? "text-gold" : isLightMode ? "text-emerald-300 hover:text-emerald-600" : "text-emerald-200/50 hover:text-white"
             )}
           >
             <Bookmark size={20} />
             <span>Bookings</span>
-            {upcomingBookings.length > 0 && (
+            {allUpcoming.some(b => b.status === 'confirmed') && (
               <span className="absolute -top-1 right-2 w-2 h-2 rounded-full bg-gold animate-ping" />
             )}
           </button>
 
           <button
             onClick={() => handleOpenBookingModal()}
-            className="w-12 h-12 rounded-full bg-gold text-[#061510] flex items-center justify-center font-bold shadow-lg ring-4 ring-[#061510] -mt-5 hover:scale-105 transition-transform"
+            className={cn(
+              "flex flex-col items-center gap-1 text-[11px] font-medium transition-colors",
+              isLightMode ? "text-emerald-300 hover:text-emerald-600" : "text-emerald-200/50 hover:text-white"
+            )}
             title="Book Appointment"
           >
-            <Scissors size={22} />
+            <Plus size={20} />
+            <span>Book</span>
           </button>
 
           <button
             onClick={() => handleTabSwitch('profile')}
             className={cn(
               "flex flex-col items-center gap-1 text-[11px] font-medium transition-colors",
-              activeTab === 'profile' ? "text-gold" : "text-emerald-200/50 hover:text-white"
+              activeTab === 'profile' ? "text-gold" : isLightMode ? "text-emerald-300 hover:text-emerald-600" : "text-emerald-200/50 hover:text-white"
             )}
           >
             <User size={20} />

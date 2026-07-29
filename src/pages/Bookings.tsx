@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { Plus, Search, Trash2, Edit2, Info, X, RefreshCw } from 'lucide-react'
+import { Plus, Search, Trash2, Edit2, Info, X, RefreshCw, Home } from 'lucide-react'
 import { useBookings, useDeleteBooking, useUpdateBooking } from '@/hooks/useBookings'
 import { formatCurrency, formatDate, formatTime, getStatusColor, cn } from '@/lib/utils'
 import BookingForm from '@/components/bookings/BookingForm'
@@ -12,6 +12,7 @@ export default function Bookings() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
+  const [homeServiceFilter, setHomeServiceFilter] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editBooking, setEditBooking] = useState<any>(null)
 
@@ -64,6 +65,10 @@ export default function Bookings() {
     ?.map(b => (cancelledIds.has(b.id) ? { ...b, status: 'cancelled' } : b))
     ?.filter(b => {
       if (statusFilter && b.status !== statusFilter) {
+        return false
+      }
+
+      if (homeServiceFilter && !b.notes?.includes('[HOME SERVICE]')) {
         return false
       }
 
@@ -139,6 +144,10 @@ export default function Bookings() {
             className="input-field pl-9"
           />
         </div>
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 bg-white border rounded-lg px-3 min-w-max cursor-pointer hover:bg-gray-50 h-[38px] md:h-auto">
+          <input type="checkbox" className="rounded text-emerald accent-emerald-600" checked={homeServiceFilter} onChange={e => setHomeServiceFilter(e.target.checked)} />
+          Home Service
+        </label>
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
@@ -242,6 +251,11 @@ export default function Bookings() {
                         {b.notes?.includes('[RE-BOOKED]') && (
                           <div className="text-[10px] text-emerald-600 font-bold mt-1 max-w-[120px] truncate flex items-center gap-1" title="This appointment was re-booked by the client">
                             <RefreshCw size={10} /> Re-booked
+                          </div>
+                        )}
+                        {b.notes?.includes('[HOME SERVICE]') && (
+                          <div className="text-[10px] text-amber-600 font-bold mt-1 max-w-[120px] truncate flex items-center gap-1" title={b.notes}>
+                            <Home size={10} /> Home Service
                           </div>
                         )}
                       </div>

@@ -10,7 +10,7 @@ import { useBookingsByDateRange } from '@/hooks/useBookings'
 import { useCalendarEvents, useCreateCalendarEvent, useDeleteCalendarEvent } from '@/hooks/useCalendarEvents'
 import BookingForm from '@/components/bookings/BookingForm'
 import { formatTime, formatDate, formatCurrency, getStatusColor, cn } from '@/lib/utils'
-import { CalendarDays, Clock, User, Phone, Plus, X, Edit2, Info, Sparkles, Trash2, Tag } from 'lucide-react'
+import { CalendarDays, Clock, User, Phone, Plus, X, Edit2, Info, Sparkles, Trash2, Tag, Home } from 'lucide-react'
 import type { BookingWithDetails } from '@/lib/database.types'
 import toast from 'react-hot-toast'
 
@@ -84,10 +84,10 @@ export default function Calendar() {
 
   const bookingEvents = activeBookings.map((b: any) => ({
     id: b.id,
-    title: `${b.client_name} - ${b.services?.name || 'Service'}`,
+    title: `${b.client_name}${b.notes?.includes('[HOME SERVICE]') ? ' HomSer.' : ''} - ${b.services?.name || 'Service'}`,
     start: `${b.booking_date}T${b.start_time}`,
     end: b.end_time ? `${b.booking_date}T${b.end_time}` : undefined,
-    backgroundColor: b.staff?.color_code || '#0A3D2E',
+    backgroundColor: '#0A3D2E',
     borderColor: 'transparent',
     extendedProps: { booking: b, type: 'booking' },
   }))
@@ -187,13 +187,18 @@ export default function Calendar() {
     const timeFormatted = booking?.start_time ? formatTime(booking.start_time) : ''
     const clientFirstName = booking?.client_name ? booking.client_name.split(' ')[0] : 'Client'
 
+    const isHomeService = booking?.notes?.includes('[HOME SERVICE]')
+
     return (
       <div
         className="w-full flex items-center gap-1 text-[11px] font-medium leading-tight px-1 py-0.5 rounded overflow-hidden truncate cursor-pointer hover:opacity-90 transition-opacity"
         title={`Click to view all bookings for ${booking?.booking_date}`}
       >
         <span className="font-semibold">{timeFormatted}</span>
-        <span className="truncate">{clientFirstName}</span>
+        <span className="truncate flex items-center gap-1">
+          {clientFirstName}
+          {isHomeService && <Home size={10} className="shrink-0" />}
+        </span>
       </div>
     )
   }
@@ -340,23 +345,23 @@ export default function Calendar() {
                   {dayEvents.map((evt: any) => (
                     <div
                       key={evt.id}
-                      className="p-3 bg-[#1a1a2e] border border-gold/30 rounded-2xl flex items-center justify-between gap-3"
+                      className="p-3 bg-white border border-gray-200 shadow-sm hover:border-gold/60 transition-all rounded-2xl flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-gold/20 border border-gold/30 flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
                           <Sparkles size={14} className="text-gold" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-gold truncate">{evt.title}</p>
-                          <p className="text-[11px] text-gray-400">
+                          <p className="text-sm font-bold text-charcoal truncate">{evt.title}</p>
+                          <p className="text-[11px] text-gray-500 font-medium">
                             {evt.is_all_day ? 'All Day' : `${formatTime(evt.start_time)} - ${formatTime(evt.end_time)}`}
                           </p>
-                          {evt.notes && <p className="text-[10px] text-gray-500 truncate mt-0.5">{evt.notes}</p>}
+                          {evt.notes && <p className="text-[10px] text-gray-400 truncate mt-0.5">{evt.notes}</p>}
                         </div>
                       </div>
                       <button
                         onClick={() => handleDeleteEvent(evt.id)}
-                        className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors flex-shrink-0"
+                        className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors flex-shrink-0"
                         title="Delete event"
                       >
                         <Trash2 size={14} />
@@ -390,9 +395,14 @@ export default function Calendar() {
                           <p className="font-bold text-charcoal flex items-center gap-1">
                             <User size={12} className="text-emerald" /> {b.client_name || 'Walk-in Client'}
                           </p>
-                          <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                          <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5 mb-1">
                             <Phone size={10} className="text-gold" /> {b.client_phone || 'N/A'}
                           </p>
+                          {b.notes?.includes('[HOME SERVICE]') && (
+                            <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md w-max">
+                              <Home size={10} /> Home Service
+                            </p>
+                          )}
                         </div>
 
                         <div className="text-right">

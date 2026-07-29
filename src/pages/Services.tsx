@@ -53,10 +53,14 @@ export default function Services() {
   const [showForm, setShowForm] = useState(false)
   const [editService, setEditService] = useState<Service | null>(null)
 
+  const uniqueCategories = Array.from(new Set(services?.map(s => s.category) || ['Hair', 'Nails', 'Other']))
+
   const [form, setForm] = useState({
     name: '',
-    category: 'Hair' as 'Hair' | 'Nails' | 'Other',
+    category: 'Hair',
+    newCategory: '',
     price: '',
+    home_service_price: '',
     estimated_cost: '',
     duration_value: '60',
     duration_unit: 'mins' as 'mins' | 'hrs',
@@ -67,8 +71,10 @@ export default function Services() {
     setEditService(null)
     setForm({
       name: '',
-      category: 'Hair',
+      category: uniqueCategories.includes('Hair') ? 'Hair' : uniqueCategories[0] || '',
+      newCategory: '',
       price: '',
+      home_service_price: '',
       estimated_cost: '',
       duration_value: '60',
       duration_unit: 'mins',
@@ -84,7 +90,9 @@ export default function Services() {
     setForm({
       name: service.name,
       category: service.category,
+      newCategory: '',
       price: service.price.toString(),
+      home_service_price: service.home_service_price?.toString() || '0',
       estimated_cost: service.estimated_cost?.toString() || '0',
       duration_value: formatMinutesForUnit(service.duration_minutes, unit),
       duration_unit: unit,
@@ -111,6 +119,12 @@ export default function Services() {
       return
     }
 
+    const finalCategory = form.category === 'NEW_CATEGORY' ? form.newCategory.trim() : form.category
+    if (form.category === 'NEW_CATEGORY' && !finalCategory) {
+      toast.error('Please enter a new category name')
+      return
+    }
+
     const duration_minutes = parseDurationStringToMinutes(form.duration_value, form.duration_unit)
 
     if (duration_minutes <= 0) {
@@ -124,8 +138,9 @@ export default function Services() {
           id: editService.id,
           updates: {
             name: form.name,
-            category: form.category,
+            category: finalCategory,
             price: parseFloat(form.price),
+            home_service_price: parseFloat(form.home_service_price || '0'),
             estimated_cost: parseFloat(form.estimated_cost || '0'),
             duration_minutes,
             is_active: form.is_active,
@@ -135,8 +150,9 @@ export default function Services() {
       } else {
         await createService.mutateAsync({
           name: form.name,
-          category: form.category,
+          category: finalCategory,
           price: parseFloat(form.price),
+          home_service_price: parseFloat(form.home_service_price || '0'),
           estimated_cost: parseFloat(form.estimated_cost || '0'),
           duration_minutes,
           is_active: form.is_active,
@@ -156,6 +172,27 @@ export default function Services() {
       toast.success('Service deleted')
     } catch {
       toast.error('Failed to delete')
+    }
+  }
+
+  const handleDeleteCategory = async (category: string, items: Service[]) => {
+    if (['Hair', 'Nails', 'Other'].includes(category)) {
+      toast.error('Cannot delete default categories.')
+      return
+    }
+    if (!confirm(`Are you sure you want to remove the "${category}" category? All ${items.length} services will be moved to "Other".`)) return
+
+    try {
+      const promises = items.map(item => 
+        updateService.mutateAsync({
+          id: item.id,
+          updates: { category: 'Other' }
+        })
+      )
+      await Promise.all(promises)
+      toast.success(`Category "${category}" removed.`)
+    } catch (err: any) {
+      toast.error('Failed to remove category.')
     }
   }
 
@@ -188,10 +225,19 @@ export default function Services() {
           const Icon = categoryIcons[category] || Sparkles
           return (
             <div key={category}>
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 group/header">
                 <Icon size={18} className="text-emerald" />
                 <h3 className="font-heading font-semibold text-charcoal">{category}</h3>
                 <span className="text-xs text-gray-400">({items.length})</span>
+                {!['Hair', 'Nails', 'Other'].includes(category) && (
+                  <button
+                    onClick={() => handleDeleteCategory(category, items)}
+                    className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 opacity-0 group-hover/header:opacity-100 transition-all ml-2"
+                    title="Remove custom category"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {items.map(service => (
@@ -205,12 +251,17 @@ export default function Services() {
                     <div className="flex items-start justify-between">
                       <div>
                         <h4 className="font-medium text-charcoal">{service.name}</h4>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center flex-wrap gap-1.5 mt-1">
                           <p className="text-lg font-heading font-bold text-emerald">
                             {formatCurrency(service.price)}
                           </p>
+                          {service.home_service_price > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap" title="Home Service Price">
+                              Home: {formatCurrency(service.home_service_price)}
+                            </span>
+                          )}
                           {service.estimated_cost > 0 && (
-                            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full whitespace-nowrap">
                               Est Cost: {formatCurrency(service.estimated_cost)}
                             </span>
                           )}
@@ -269,17 +320,28 @@ export default function Services() {
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Category *</label>
                 <select
                   value={form.category}
-                  onChange={e => setForm(prev => ({ ...prev, category: e.target.value as any }))}
+                  onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
                   className="input-field"
                 >
-                  <option value="Hair">Hair</option>
-                  <option value="Nails">Nails</option>
-                  <option value="Other">Other</option>
+                  {uniqueCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="NEW_CATEGORY">+ Add New Category</option>
                 </select>
+                {form.category === 'NEW_CATEGORY' && (
+                  <input
+                    value={form.newCategory}
+                    onChange={e => setForm(prev => ({ ...prev, newCategory: e.target.value }))}
+                    placeholder="Enter custom category name..."
+                    className="input-field mt-3"
+                    autoFocus
+                    required
+                  />
+                )}
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Price (₱) *</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Base Price (₱) *</label>
                   <input
                     type="number"
                     value={form.price}
@@ -287,9 +349,25 @@ export default function Services() {
                     className="input-field font-bold text-emerald"
                     min="0"
                     step="0.01"
+                    onFocus={e => e.target.select()}
                     required
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-emerald-700 mb-1.5">Home Service Price (₱)</label>
+                  <input
+                    type="number"
+                    value={form.home_service_price}
+                    onChange={e => setForm(prev => ({ ...prev, home_service_price: e.target.value }))}
+                    className="input-field font-semibold text-emerald-800"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 500"
+                    onFocus={e => e.target.select()}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">Est. Product Cost (₱)</label>
                   <input
@@ -300,6 +378,7 @@ export default function Services() {
                     min="0"
                     step="0.01"
                     placeholder="e.g. 150"
+                    onFocus={e => e.target.select()}
                   />
                 </div>
                 <div>
@@ -311,6 +390,7 @@ export default function Services() {
                       onChange={e => setForm(prev => ({ ...prev, duration_value: e.target.value }))}
                       className="input-field flex-1 font-medium"
                       placeholder={form.duration_unit === 'hrs' ? "e.g. 1:30" : "e.g. 60"}
+                      onFocus={e => e.target.select()}
                       required
                     />
                     <select
