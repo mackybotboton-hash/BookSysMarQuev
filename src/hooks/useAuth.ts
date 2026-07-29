@@ -20,7 +20,11 @@ export function useAuth() {
 
     // 2. Listen for auth state changes (e.g. user clicks email verification link)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event: any, session: any) => {
+      async (event: any, session: any) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          window.location.href = '/update-password'
+        }
+
         if (session) {
           setSession(session)
           setUser(session.user)

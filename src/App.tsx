@@ -20,6 +20,7 @@ const Reports = lazy(() => import('@/pages/Reports'))
 const Inventory = lazy(() => import('@/pages/Inventory'))
 const PublicBooking = lazy(() => import('@/pages/PublicBooking'))
 const ClientDashboard = lazy(() => import('@/pages/ClientDashboard'))
+const UpdatePassword = lazy(() => import('@/pages/UpdatePassword'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/book" element={<PublicBooking />} />
               <Route path="/client-dashboard" element={<ClientDashboard />} />
+              <Route path="/update-password" element={<UpdatePassword />} />
 
               {/* Protected Admin/Staff Routes */}
               <Route
