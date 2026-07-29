@@ -13,7 +13,7 @@ interface AuthModalProps {
 export default function AuthModal({ onSuccess, onClose, initialMode = 'signin' }: AuthModalProps) {
   const { signIn, signUp } = useAuth()
 
-  const [mode, setMode] = useState<'signin' | 'signup' | 'verify'>(initialMode)
+  const [mode, setMode] = useState<'signin' | 'signup' | 'verify' | 'forgot'>(initialMode)
   const [unverifiedEmail, setUnverifiedEmail] = useState('')
 
   // Form states
@@ -42,6 +42,30 @@ export default function AuthModal({ onSuccess, onClose, initialMode = 'signin' }
       onSuccess()
     } catch (err: any) {
       toast.error(err.message || 'Sign in failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle Forgot Password
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) {
+      toast.error('Please enter your email address')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/login',
+      })
+      if (error) throw error
+      toast.success('Password reset link sent! Please check your email.')
+      setMode('signin')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send reset link')
     } finally {
       setLoading(false)
     }
@@ -92,7 +116,7 @@ export default function AuthModal({ onSuccess, onClose, initialMode = 'signin' }
                 <Sparkles size={12} /> MarQuevedo Hair Studio
               </span>
               <h3 className="font-heading font-extrabold text-2xl text-white mt-0.5">
-                {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create an Account' : 'Verify Email'}
+                {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create an Account' : mode === 'forgot' ? 'Reset Password' : 'Verify Email'}
               </h3>
             </div>
           </div>
@@ -119,7 +143,12 @@ export default function AuthModal({ onSuccess, onClose, initialMode = 'signin' }
               </div>
 
               <div>
-                <label className="block font-medium text-emerald-200 mb-1.5">Password *</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-medium text-emerald-200">Password *</label>
+                  <button type="button" onClick={() => setMode('forgot')} className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
+                    Forgot Password?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gold/70" />
                   <input
@@ -160,6 +189,48 @@ export default function AuthModal({ onSuccess, onClose, initialMode = 'signin' }
                     Sign up
                   </button>
                 </p>
+              </div>
+            </form>
+          )}
+
+          {/* MODE: FORGOT PASSWORD */}
+          {mode === 'forgot' && (
+            <form onSubmit={handleForgotPassword} className="space-y-4 text-xs">
+              <p className="text-gray-300 mb-4 leading-relaxed">
+                Enter the email address associated with your account, and we'll send you a link to reset your password.
+              </p>
+              
+              <div>
+                <label className="block font-medium text-emerald-200 mb-1">Email Address *</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gold/70" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your.email@example.com"
+                    className="w-full pl-10 pr-4 py-3 bg-black/50 border border-emerald-700/60 rounded-xl text-xs text-white placeholder-emerald-300/40 focus:outline-none focus:border-gold transition-colors"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-gold w-full py-3.5 text-sm font-bold shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+              >
+                {loading ? 'Sending Link...' : 'Send Reset Link'} <ArrowRight size={16} />
+              </button>
+
+              <div className="pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setMode('signin')}
+                  className="text-emerald-400 font-bold hover:text-emerald-300 transition-colors"
+                >
+                  Back to Sign In
+                </button>
               </div>
             </form>
           )}
@@ -241,6 +312,15 @@ export default function AuthModal({ onSuccess, onClose, initialMode = 'signin' }
                       placeholder="Metro Manila"
                       className="w-full pl-8 pr-3 py-3 bg-black/50 border border-emerald-700/60 rounded-xl text-xs text-white focus:outline-none focus:border-gold"
                     />
+                    <div className="flex items-center justify-between w-full mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" className="w-3.5 h-3.5 rounded border-emerald-700/50 bg-black/50 text-gold focus:ring-gold focus:ring-offset-0" />
+                        <span className="text-[10px] text-gray-400">Remember me</span>
+                      </label>
+                      <button type="button" onClick={() => setMode('forgot')} className="text-[10px] text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
+                        Forgot Password?
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
