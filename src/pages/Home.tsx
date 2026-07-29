@@ -388,7 +388,7 @@ export default function Home() {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium">
             <a href="#services" className={cn("transition-colors", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>Services</a>
             <a href="#why-us" className={cn("transition-colors", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>Why Choose Us</a>
             <a href="#reviews" className={cn("transition-colors flex items-center gap-1", isLightMode ? "text-gray-600 hover:text-emerald" : "text-emerald-100 hover:text-gold")}>
